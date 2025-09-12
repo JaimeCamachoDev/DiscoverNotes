@@ -4,7 +4,7 @@
 
 # **DiscoverNotes**
 
-_**{{ repo-description }}**_
+_**Es un componente de documentación visual en Unity para notas.**_
 
 
 </header>
