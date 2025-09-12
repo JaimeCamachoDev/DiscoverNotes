@@ -1,24 +1,34 @@
 ﻿#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEditor;
-using System;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Collections.Generic;
 
 public class NotesTooltipWindow : EditorWindow
 {
-    // ====== Estilos y layout ======
     GUIStyle titleStyle, bodyStyle;
     const float MIN_W = 160f;
-    const float MAX_W = 1024f; // permitir títulos largos en una sola línea
+    const float MAX_W = 1024f;
     const float SCREEN_MARGIN = 12f;
     const float ANCHOR_GAP = 4f;
     const float PADDING = 10f;
     const float HEADER_STRIP = 4f;
-    const float GAP = 2f;
     const float ICON = 16f;
     const float ICON_PAD = 6f;
+
+    // Chincheta
+    const float PIN_W = 20f;
+    const float PIN_GAP = 4f;
+    const float PIN_RESERVE = PIN_W + PIN_GAP;
+
+    static NotesTooltipWindow _instance;
+    public static NotesTooltipWindow Instance => _instance;
+
+    [SerializeField] bool _pinned;
+    public bool IsPinned => _pinned;
+
+    GUIContent _starIcon;
 
     Texture iconTex;
     GameObjectNotes data;
@@ -28,45 +38,20 @@ public class NotesTooltipWindow : EditorWindow
     double lastMouseOverTS;
     double lastAnchorHoverTS;
     double nextHierarchyRepaintTS;
+    const double CLOSE_DELAY = 0.3;
 
-    const string DATE_FMT = "dd/MM/yyyy";
-    // Bloqueo de colocación para evitar jitter
     int _currentTargetId = -1;
     bool _sideLocked = false;
-    bool _sidePlaceRight = true; // lado elegido al abrir (true=derecha, false=izquierda)
+    bool _sidePlaceRight = true;
 
+    // Spans para interacción (interpretados al render)
+    readonly List<LinkMarkup.LinkSpan> _links = new List<LinkMarkup.LinkSpan>();
+    readonly List<LinkMarkup.ChecklistSpan> _checks = new List<LinkMarkup.ChecklistSpan>();
+    readonly List<LinkMarkup.ImageSpan> _images = new List<LinkMarkup.ImageSpan>();
+    LinkMarkup.VisibleIndexMap _indexMap;
 
-    // ====== Enlaces clicables ======
-    // [NombreVisible](GlobalObjectId)
-    static readonly Regex RX_LINK = new Regex(@"\[(?<name>[^\]]+)\]\((?<id>[^)]+)\)", RegexOptions.Compiled);
-
-    class IndexMap
-    {
-        public int[] str2vis;   // len = text.Length + 1
-        public int[] vis2str;   // len = visibleLen + 1
-        public int visibleLen;
-        public string text;
-    }
-
-    class LinkInfo
-    {
-        public string name;
-        public string id;
-
-        // Rango en el STRING PINTADO (con nuestros <color>/<b>)
-        public int strStart;
-        public int strEnd;
-
-        // Rango en índices VISIBLES post-rich
-        public int vStart;
-        public int vEnd;
-
-        // Zonas de click por línea
-        public readonly List<Rect> hitRects = new List<Rect>();
-    }
-
-    readonly List<LinkInfo> _links = new List<LinkInfo>();
-    IndexMap _indexMap;
+    List<(LinkMarkup.ImageSpan img, Texture2D tex, Rect uv, float extraBefore, float width, float height, Rect drawRect)> _imgLayout
+        = new List<(LinkMarkup.ImageSpan, Texture2D, Rect, float, float, float, Rect)>();
 
     public static NotesTooltipWindow Create()
     {
@@ -75,14 +60,25 @@ public class NotesTooltipWindow : EditorWindow
         return w;
     }
 
+    void OnEnable()
+    {
+        _instance = this;
+        _starIcon = EditorIconHelper.GetStarIcon();
+    }
+
+    void OnDisable()
+    {
+        if (_instance == this) _instance = null;
+    }
+
     void EnsureStyles()
     {
         if (titleStyle != null) return;
         titleStyle = new GUIStyle(EditorStyles.boldLabel)
         {
             richText = true,
-            wordWrap = false,               // ← UNA SOLA LÍNEA
-            clipping = TextClipping.Clip,   // ← no envolver, recortar si hiciera falta
+            wordWrap = false,
+            clipping = TextClipping.Clip,
             alignment = TextAnchor.MiddleLeft,
             fontSize = 13,
             normal = { textColor = Color.white }
@@ -96,15 +92,14 @@ public class NotesTooltipWindow : EditorWindow
         };
     }
 
+    /// <summary>
+    /// Muestra el tooltip para una nota. El texto subyacente SIEMPRE es plano;
+    /// aquí se interpreta (links, checklists, imágenes) SOLO al render.
+    /// </summary>
     public void ShowFor(GameObjectNotes notes, Rect anchorScreenRect)
     {
-        // Si cambia el objeto/nota, reseteamos el bloqueo de lado
         bool targetChanged = _currentTargetId != notes.GetInstanceID();
-        if (targetChanged)
-        {
-            _currentTargetId = notes.GetInstanceID();
-            _sideLocked = false;
-        }
+        if (targetChanged) { _currentTargetId = notes.GetInstanceID(); _sideLocked = false; }
 
         EnsureStyles();
         data = notes;
@@ -112,23 +107,17 @@ public class NotesTooltipWindow : EditorWindow
         var cat = NoteStylesProvider.FindCategory(data.Category);
         accent = cat != null ? cat.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f);
         bg = cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f);
-        bg.a = 1f; // opaco
+        bg.a = 1f;
 
         iconTex = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(data.Category)?.image);
 
-        PrepareContentAndLinks(anchorScreenRect);   // o tu variante con 1 línea en cabecera
+        PrepareContent();   // <-- Interpretación en el momento de preparar contenido
         CalculateSize();
 
-        // Decidir lado solo la PRIMERA vez; luego queda bloqueado hasta que se cierre o cambie de target
         float screenW = Screen.currentResolution.width;
         bool computedPlaceRight = (anchorScreenRect.xMax + ANCHOR_GAP + boxW) <= (screenW - SCREEN_MARGIN);
-        if (!_sideLocked)
-        {
-            _sidePlaceRight = computedPlaceRight;
-            _sideLocked = true;
-        }
+        if (!_sideLocked) { _sidePlaceRight = computedPlaceRight; _sideLocked = true; }
 
-        // ¡OJO! ahora pasamos el lado forzado para evitar alternancias
         PositionWindow(anchorScreenRect, _sidePlaceRight);
 
         if (!hasFocus) ShowPopup();
@@ -137,29 +126,30 @@ public class NotesTooltipWindow : EditorWindow
         lastAnchorHoverTS = EditorApplication.timeSinceStartup;
         lastMouseOverTS = lastAnchorHoverTS;
         wantsMouseMove = true;
-
     }
 
-    void PrepareContentAndLinks(Rect anchorScreenRect)
+    void PrepareContent()
     {
+        // El cuerpo siempre es texto plano. Se recorta por seguridad en tooltips.
         string raw = (data.NotesText ?? string.Empty).Trim();
         if (raw.Length > 2000) raw = raw.Substring(0, 2000) + "…";
 
         string author = string.IsNullOrEmpty(data.Author) ? "Anónimo" : data.Author;
-        string date = string.IsNullOrEmpty(data.DateCreated) ? DateTime.Now.ToString(DATE_FMT) : data.DateCreated;
+        string date = string.IsNullOrEmpty(data.DateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : data.DateCreated;
         string catName = string.IsNullOrEmpty(data.Category) ? "Nota" : data.Category;
 
         float screenW = Screen.currentResolution.width;
-        float maxTitleWidth = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f));
+        float maxTitleW = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f) - PIN_RESERVE);
+        titleGC = new GUIContent(BuildOneLineTitle(catName, author, date, maxTitleW, titleStyle));
 
-        // Construir SIEMPRE en una sola línea, sin parsear el rich text
-        string oneLine = BuildOneLineTitle(catName, author, date, maxTitleWidth, titleStyle);
-        titleGC = new GUIContent(oneLine);
+        // === Interpretación modular (en tiempo de dibujo) ===
+        _links.Clear(); _checks.Clear(); _images.Clear();
+        string styled = LinkMarkup.BuildStyled(raw, _links, _checks, _images, out _indexMap);
+        bodyGC = new GUIContent(styled);
 
-        // Cuerpo con enlaces cliqueables (estilo + mapa + links)
-        BuildStyledAndLinksAndMap(raw, out string displayStyled, _links, out _indexMap);
-        bodyGC = new GUIContent(displayStyled);
+        _imgLayout.Clear();
     }
+
     string BuildOneLineTitle(string category, string author, string date, float maxW, GUIStyle st)
     {
         string Sep = "  •  ";
@@ -168,155 +158,104 @@ public class NotesTooltipWindow : EditorWindow
 
         string c = category, a = author, d = date;
 
-        // Si ya cabe, listo
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW)
-            return Compose(c, a, d);
+        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
 
-        // 1) Reducir autor
-        a = ShrinkPart(a, (ax) => Compose(c, ax, d), maxW, st);
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW)
-            return Compose(c, a, d);
+        c = ShrinkPart(c, cx => Compose(cx, a, d), maxW, st);
+        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
 
-        // 2) Reducir categoría
-        c = ShrinkPart(c, (cx) => Compose(cx, a, d), maxW, st);
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW)
-            return Compose(c, a, d);
+        a = ShrinkPart(a, ax => Compose(c, ax, d), maxW, st);
+        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
 
-        // 3) Reducir fecha
-        d = ShrinkPart(d, (dx) => Compose(c, a, dx), maxW, st);
+        d = ShrinkPart(d, dx => Compose(c, a, dx), maxW, st);
         return Compose(c, a, d);
     }
 
-    // Reduce por binaria con “…” el texto de una parte concreta
-    string ShrinkPart(string original, Func<string, string> composeWithPart, float maxW, GUIStyle st)
+    string ShrinkPart(string original, Func<string, string> withPart, float maxW, GUIStyle st)
     {
         if (string.IsNullOrEmpty(original)) return original;
+        if (st.CalcSize(new GUIContent(withPart(original))).x <= maxW) return original;
 
-        // Si ya cabe, no tocar
-        if (st.CalcSize(new GUIContent(composeWithPart(original))).x <= maxW)
-            return original;
-
-        int lo = 0, hi = original.Length; // buscamos el máximo prefijo que cabe con “…”
-        int best = -1;
+        int lo = 0, hi = original.Length, best = -1;
         while (lo <= hi)
         {
             int mid = (lo + hi) >> 1;
             string cand = (mid <= 0) ? "…" : original.Substring(0, mid) + "…";
-            float w = st.CalcSize(new GUIContent(composeWithPart(cand))).x;
+            float w = st.CalcSize(new GUIContent(withPart(cand))).x;
             if (w <= maxW) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
         }
         if (best <= 0) return "…";
         return original.Substring(0, best) + "…";
     }
 
-
-    // Recorta (con …) primero el autor, luego la categoría y por último la fecha
-    string FitTitleToWidth(string richTitle, float maxW, GUIStyle st)
-    {
-        // Esperamos "<b>cat</b>  •  autor  •  fecha"
-        ExtractTitleParts(richTitle, out string cat, out string author, out string date);
-        string BuildRich(string c, string a, string d) => $"<b>{c}</b>  •  {a}  •  {d}";
-
-        string cur = BuildRich(cat, author, date);
-        if (st.CalcSize(new GUIContent(cur)).x <= maxW) return cur;
-
-        // 1) recortar autor
-        string a2 = EllipsizeToWidth(author, maxW - st.CalcSize(new GUIContent(BuildRich(cat, "", date))).x, st);
-        cur = BuildRich(cat, a2, date);
-        if (st.CalcSize(new GUIContent(cur)).x <= maxW) return cur;
-
-        // 2) recortar categoría
-        string c2 = EllipsizeToWidth(cat, maxW - st.CalcSize(new GUIContent(BuildRich("", a2, date))).x, st);
-        cur = BuildRich(c2, a2, date);
-        if (st.CalcSize(new GUIContent(cur)).x <= maxW) return cur;
-
-        // 3) si aún no cabe, recortar fecha
-        string d2 = EllipsizeToWidth(date, maxW - st.CalcSize(new GUIContent(BuildRich(c2, a2, ""))).x, st);
-        return BuildRich(c2, a2, d2);
-    }
-
-    void ExtractTitleParts(string richTitle, out string cat, out string author, out string date)
-    {
-        // "<b>cat</b>  •  author  •  date"
-        cat = ""; author = ""; date = "";
-        try
-        {
-            int b1 = richTitle.IndexOf("<b>", StringComparison.Ordinal);
-            int b2 = richTitle.IndexOf("</b>", StringComparison.Ordinal);
-            if (b1 >= 0 && b2 > b1) cat = richTitle.Substring(b1 + 3, b2 - (b1 + 3));
-
-            int after = b2 + 4;
-            string rest = (after < richTitle.Length) ? richTitle.Substring(after) : "";
-            var parts = rest.Split(new string[] { "•" }, StringSplitOptions.None);
-            if (parts.Length >= 2)
-            {
-                author = parts[0].Replace("  ", "").Replace("·", "").Trim();
-                date = parts[1].Trim();
-            }
-        }
-        catch { }
-    }
-
-    string EllipsizeToWidth(string text, float maxW, GUIStyle st)
-    {
-        if (maxW <= 0f) return "…";
-        if (string.IsNullOrEmpty(text)) return text;
-        var gc = new GUIContent(text);
-        if (st.CalcSize(gc).x <= maxW) return text;
-
-        int lo = 0, hi = text.Length;
-        while (lo < hi)
-        {
-            int mid = (lo + hi + 1) >> 1;
-            string cand = text.Substring(0, mid) + "…";
-            if (st.CalcSize(new GUIContent(cand)).x <= maxW) lo = mid;
-            else hi = mid - 1;
-        }
-        if (lo <= 0) return "…";
-        return text.Substring(0, lo) + "…";
-    }
-
+    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
     void CalculateSize()
     {
         float screenW = Screen.currentResolution.width;
 
-        // Título en UNA sola línea
         Vector2 ts = titleStyle.CalcSize(titleGC);
         float titleW = ts.x;
         float titleH = Mathf.Max(ts.y, ICON);
 
-        // Ancho preferido del cuerpo
         float bodyPrefW = MeasureBodyPreferredWidth(bodyGC.text);
 
-        // Ancho total
         boxW = Mathf.Clamp(
-            (iconTex != null ? (ICON + ICON_PAD) : 0f) + Mathf.Max(titleW, bodyPrefW) + PADDING * 2f,
+            (iconTex != null ? (ICON + ICON_PAD) : 0f) + Mathf.Max(titleW, bodyPrefW) + PADDING * 2f + PIN_RESERVE,
             MIN_W, Mathf.Min(MAX_W, screenW - SCREEN_MARGIN * 2f)
         );
 
-        // Alturas
-        float innerW = boxW - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f);
-        float bodyH = bodyStyle.CalcHeight(bodyGC, innerW);
-        boxH = titleH + bodyH + PADDING * 2f + HEADER_STRIP + 6f;
+        float innerW = boxW - PADDING * 2f - PIN_RESERVE;
+        float textH = bodyStyle.CalcHeight(bodyGC, innerW);
+
+        float extra = 0f;
+        float lineH = GetLineHeight(bodyStyle);
+        foreach (var im in _images)
+        {
+            if (im.src == "__HR__")
+            {
+                float h = 1f + 8f; // línea + padding vertical del render
+                extra += (h - lineH);
+                continue;
+            }
+
+            if (!LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var isExternal) || tex == null)
+                continue;
+
+            float w = Mathf.Min(innerW, 200f);
+            float h2 = uv.width > 0f && uv.height > 0f
+                        ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
+                        : tex.height * (w / Mathf.Max(1f, (float)tex.width));
+
+            extra += (h2 - lineH);
+        }
+
+        boxH = titleH + textH + extra + PADDING * 2f + HEADER_STRIP + 6f;
     }
 
-    void PositionWindow(Rect anchorScreenRect, bool placeRight)
+
+
+    float MeasureBodyPreferredWidth(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return 0f;
+        var st = new GUIStyle(bodyStyle) { wordWrap = false, richText = true };
+        float max = 0f;
+        var lines = body.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var size = st.CalcSize(new GUIContent(lines[i]));
+            if (size.x > max) max = size.x;
+        }
+        return Mathf.Ceil(max);
+    }
+
+    void PositionWindow(Rect anchor, bool placeRight)
     {
         float screenW = Screen.currentResolution.width;
         float screenH = Screen.currentResolution.height;
+        bool flipUp = (anchor.yMax + 2f + boxH) > (screenH - SCREEN_MARGIN);
 
-        bool flipUp = (anchorScreenRect.yMax + GAP + boxH) > (screenH - SCREEN_MARGIN);
+        float x = placeRight ? (anchor.xMax + ANCHOR_GAP) : (anchor.xMin - boxW - ANCHOR_GAP);
+        float y = flipUp ? (anchor.y - boxH - 2f) : (anchor.yMax + 2f);
 
-        float x = placeRight
-            ? (anchorScreenRect.xMax + ANCHOR_GAP)
-            : (anchorScreenRect.xMin - boxW - ANCHOR_GAP);
-
-        float y = flipUp
-            ? (anchorScreenRect.y - boxH - GAP)
-            : (anchorScreenRect.yMax + GAP);
-
-
-        // Clamp + coord enteras para estabilidad
         x = Mathf.Clamp(x, SCREEN_MARGIN, screenW - boxW - SCREEN_MARGIN);
         y = Mathf.Clamp(y, SCREEN_MARGIN, screenH - boxH - SCREEN_MARGIN);
 
@@ -325,7 +264,6 @@ public class NotesTooltipWindow : EditorWindow
         minSize = new Vector2(r.width, r.height);
         maxSize = new Vector2(r.width, r.height);
     }
-
 
     void Update()
     {
@@ -342,13 +280,20 @@ public class NotesTooltipWindow : EditorWindow
             nextHierarchyRepaintTS = now + 0.05;
         }
 
-        if (!overSelf && !overAnchorRecently) Close();
+        if (!_pinned && !overSelf && !overAnchorRecently) Close();
     }
-
-    const double CLOSE_DELAY = 0.18;
 
     void OnGUI()
     {
+        // Cerrar si se hace click fuera
+        if (Event.current.rawType == EventType.MouseDown && EditorWindow.mouseOverWindow != this)
+        {
+            GUIUtility.hotControl = 0;
+            GUIUtility.keyboardControl = 0;
+            Close();
+            return;
+        }
+
         EnsureStyles();
 
         TooltipRenderer.DrawBackground(position, bg, accent);
@@ -360,11 +305,16 @@ public class NotesTooltipWindow : EditorWindow
 
         var inner = new Rect(PADDING, PADDING + HEADER_STRIP, position.width - PADDING * 2f, position.height - PADDING * 2f - HEADER_STRIP);
 
-        // ---- Título: icono + texto en UNA sola línea
+        // Título (con chincheta)
         Vector2 ts = titleStyle.CalcSize(titleGC);
         float titleH = Mathf.Max(ts.y, ICON);
         Rect titleR = new Rect(inner.x, inner.y, inner.width, titleH);
 
+        // Reservar hueco pin
+        Rect pinRect = new Rect(titleR.xMax - PIN_W, titleR.y + Mathf.Floor((titleH - PIN_W) * 0.5f), PIN_W, PIN_W);
+        titleR.width -= PIN_RESERVE;
+
+        // Icono
         if (iconTex != null)
         {
             var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((titleH - ICON) * 0.5f), ICON, ICON);
@@ -373,274 +323,323 @@ public class NotesTooltipWindow : EditorWindow
             titleR.width -= ICON + ICON_PAD;
         }
 
-        // No envolver: si hubo que truncar, ya viene con “…”
         GUI.Label(titleR, titleGC, titleStyle);
 
-        // ---- Cuerpo (richText + clicks)
-        var bodyR = new Rect(inner.x, inner.y + titleH + 4f, inner.width, inner.height - titleH - 4f);
-        GUI.Label(bodyR, bodyGC, bodyStyle);
+        var prev = GUI.color;
+        GUI.color = _pinned ? new Color(1f, 0.85f, 0.1f, 1f) : new Color(0.6f, 0.6f, 0.6f, 1f);
+        if (GUI.Button(pinRect, _starIcon ?? new GUIContent("★"), GUIStyle.none)) { _pinned = !_pinned; Repaint(); }
+        GUI.color = prev;
 
-        // Clickables
-        LayoutLinkHitRects(bodyR);
-        DrawLinkButtons();
-        HandleClickFallback(bodyR);
+        // Cuerpo (alineado a cabecera; restamos pin)
+        var bodyR = new Rect(inner.x, inner.y + titleH + 4f, inner.width - PIN_RESERVE, inner.height - titleH - 4f);
+
+        // === NUEVO: render segmentado con imágenes inline (izquierda) y zonas clickables correctas ===
+        RenderBodyWithInlineImages(bodyR);
+
+        HandleLinksClicks();
+        HandleChecklistClicks(bodyR);
+        HandleImageClicks();
 
         if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             Close();
     }
 
-    float MeasureBodyPreferredWidth(string body)
-    {
-        if (string.IsNullOrEmpty(body)) return 0f;
-        var st = new GUIStyle(bodyStyle) { wordWrap = false, richText = true };
-        float max = 0f;
-        var lines = body.Split('\n');
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var size = st.CalcSize(new GUIContent(lines[i]));
-            if (size.x > max) max = size.x;
-        }
-        return Mathf.Ceil(max);
-    }
-
-    // ====== Construcción de estilo + mapa de índices + enlaces ======
-    void BuildStyledAndLinksAndMap(string raw, out string displayStyled, List<LinkInfo> linksOut, out IndexMap map)
-    {
-        linksOut.Clear();
-        var sb = new StringBuilder(raw.Length + 64);
-
-        int last = 0;
-        foreach (Match m in RX_LINK.Matches(raw))
-        {
-            if (m.Index > last) sb.Append(raw, last, m.Index - last);
-
-            string rawName = m.Groups["name"].Value;
-            string id = m.Groups["id"].Value;
-
-            const string prefix = "<color=#4EA3FF><b>";
-            const string suffix = "</b></color>";
-
-            int strStart = sb.Length + prefix.Length;
-            sb.Append(prefix).Append(rawName).Append(suffix);
-            int strEnd = strStart + rawName.Length;
-
-            linksOut.Add(new LinkInfo
-            {
-                name = rawName,
-                id = id,
-                strStart = strStart,
-                strEnd = strEnd
-            });
-
-            last = m.Index + m.Length;
-        }
-        if (last < raw.Length) sb.Append(raw, last, raw.Length - last);
-
-        displayStyled = sb.ToString();
-
-        map = BuildVisibleIndexMapForIMGUI(displayStyled);
-
-        foreach (var li in linksOut)
-        {
-            li.vStart = SafeStrToVis(map, li.strStart);
-            li.vEnd = SafeStrToVis(map, li.strEnd);
-        }
-    }
-
-    static int SafeStrToVis(IndexMap map, int strIndex)
-    {
-        strIndex = Mathf.Clamp(strIndex, 0, map.str2vis.Length - 1);
-        return map.str2vis[strIndex];
-    }
-
-    // Reconoce etiquetas IMGUI reales
-    static IndexMap BuildVisibleIndexMapForIMGUI(string text)
-    {
-        var map = new IndexMap { text = text };
-        int n = text.Length;
-        map.str2vis = new int[n + 1];
-
-        List<int> vis2strList = new List<int>(n + 1);
-
-        int i = 0;
-        int v = 0;
-        vis2strList.Add(0);
-
-        while (i < n)
-        {
-            if (TryGetValidIMGUIRichTag(text, i, out int tagLen))
-            {
-                for (int k = 0; k < tagLen; k++) map.str2vis[i + k] = v;
-                i += tagLen;
-                continue;
-            }
-
-            map.str2vis[i] = v;
-            i++;
-            v++;
-            vis2strList.Add(i);
-        }
-
-        map.str2vis[n] = v;
-        vis2strList.Add(n);
-
-        map.vis2str = vis2strList.ToArray();
-        map.visibleLen = v;
-        return map;
-    }
-
-    static bool TryGetValidIMGUIRichTag(string text, int i, out int tagLen)
-    {
-        tagLen = 0;
-        if (text[i] != '<') return false;
-        int gt = text.IndexOf('>', i + 1);
-        if (gt < 0) return false;
-
-        string body = text.Substring(i + 1, gt - (i + 1));
-        string lower = body.Trim().ToLowerInvariant();
-
-        if (lower == "b" || lower == "/b" || lower == "i" || lower == "/i" ||
-            lower == "/color" || lower == "/size") { tagLen = gt - i + 1; return true; }
-
-        if (lower.StartsWith("size=")) { tagLen = gt - i + 1; return true; }
-
-        if (lower.StartsWith("color="))
-        {
-            var val = lower.Substring("color=".Length).Trim().Trim('\'', '"');
-            if (LooksLikeValidColorToken(val)) { tagLen = gt - i + 1; return true; }
-            return false;
-        }
-
-        return false;
-    }
-
-    static bool LooksLikeValidColorToken(string v)
-    {
-        if (string.IsNullOrEmpty(v)) return false;
-        if (v[0] == '#') { int L = v.Length; return (L == 4 || L == 5 || L == 7 || L == 9); }
-        switch (v)
-        {
-            case "red":
-            case "green":
-            case "blue":
-            case "black":
-            case "white":
-            case "yellow":
-            case "cyan":
-            case "magenta":
-            case "grey":
-            case "gray":
-                return true;
-            default: return false;
-        }
-    }
-
-    // ====== Layout y click ======
-    void LayoutLinkHitRects(Rect bodyR)
+    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+    void RenderBodyWithInlineImages(Rect bodyR)
     {
         foreach (var l in _links) l.hitRects.Clear();
-        if (_links.Count == 0 || string.IsNullOrEmpty(bodyGC.text)) return;
+        foreach (var c in _checks) c.hitRects.Clear();
+        _imgLayout.Clear();
 
-        float lineH = bodyStyle.lineHeight > 0 ? bodyStyle.lineHeight : bodyStyle.CalcSize(new GUIContent("Ay")).y;
+        string full = bodyGC.text ?? string.Empty;
 
-        foreach (var li in _links)
+        var orderedImgs = new List<LinkMarkup.ImageSpan>(_images);
+        orderedImgs.Sort((a, b) => a.strMarkerIndex.CompareTo(b.strMarkerIndex));
+
+        float curY = bodyR.y;
+        int curStr = 0;
+
+        float contentW = bodyR.width;
+        float lineH = GetLineHeight(bodyStyle);
+
+        int FindLineStartStr(int strIdx)
         {
-            int vStart = Mathf.Clamp(li.vStart, 0, _indexMap.visibleLen);
-            int vEnd = Mathf.Clamp(li.vEnd, 0, _indexMap.visibleLen);
-            if (vEnd <= vStart) continue;
+            int p = Mathf.Clamp(strIdx, 0, (full != null ? full.Length : 0));
+            int nl = (full != null && p > 0) ? full.LastIndexOf('\n', p - 1) : -1;
+            return (nl < 0) ? 0 : (nl + 1);
+        }
+        int FindLineEndStr(int strIdx)
+        {
+            int nl = full.IndexOf('\n', strIdx);
+            return (nl < 0) ? full.Length : (nl + 1);
+        }
 
-            bool hasCurrent = false;
-            float curY = 0f, minX = 0f, maxX = 0f;
+        foreach (var im in orderedImgs)
+        {
+            // 1) texto previo
+            int segStartStr = curStr;
+            int lineStartStr = FindLineStartStr(im.strMarkerIndex);
 
-            for (int v = vStart; v < vEnd; v++)
+            if (lineStartStr > segStartStr)
             {
-                Vector2 a = bodyStyle.GetCursorPixelPosition(bodyR, bodyGC, v);
-                Vector2 b = bodyStyle.GetCursorPixelPosition(bodyR, bodyGC, v + 1);
+                string segText = full.Substring(segStartStr, lineStartStr - segStartStr);
+                float segH = bodyStyle.CalcHeight(new GUIContent(segText), contentW);
 
-                float y = a.y;
-                float w = b.x - a.x;
-                bool newLine = (Mathf.Abs(b.y - a.y) > 0.001f) || (w <= 0.001f);
+                GUI.Label(new Rect(bodyR.x, curY, contentW, segH), segText, bodyStyle);
 
-                if (!hasCurrent)
+                var segMap = LinkMarkup.BuildVisibleIndexMapForIMGUI(segText);
+                int segVisStart = _indexMap.str2vis[segStartStr];
+                int segVisEnd = _indexMap.str2vis[lineStartStr];
+
+                // links
                 {
-                    hasCurrent = true;
-                    curY = y;
-                    minX = a.x;
-                    maxX = Mathf.Max(a.x, b.x);
+                    var tmp = new List<LinkMarkup.LinkSpan>();
+                    foreach (var li in _links)
+                        if (li.vStart >= segVisStart && li.vEnd <= segVisEnd && li.vEnd > li.vStart)
+                            tmp.Add(new LinkMarkup.LinkSpan { name = li.name, id = li.id, vStart = li.vStart - segVisStart, vEnd = li.vEnd - segVisStart, isExternal = li.isExternal, isBroken = li.isBroken });
+
+                    if (tmp.Count > 0)
+                    {
+                        LinkMarkup.LayoutLinkHitRects(new Rect(bodyR.x, curY, contentW, segH),
+                            bodyStyle, new GUIContent(segText), segMap, tmp);
+                        foreach (var t in tmp)
+                        {
+                            var real = _links.Find(x => x.id == t.id && x.name == t.name &&
+                                                        x.vStart + segVisStart == t.vStart + segVisStart);
+                            if (real != null) real.hitRects.AddRange(t.hitRects);
+                        }
+                    }
                 }
-                else if (newLine || Mathf.Abs(y - curY) > 0.5f)
+                // checks
                 {
-                    if (maxX > minX) li.hitRects.Add(new Rect(minX, curY, maxX - minX, lineH));
-                    curY = y;
-                    minX = a.x;
-                    maxX = Mathf.Max(a.x, b.x);
+                    var tmp = new List<LinkMarkup.ChecklistSpan>();
+                    foreach (var ck in _checks)
+                        if (ck.vContentStart >= segVisStart && ck.vContentStart < segVisEnd)
+                            tmp.Add(new LinkMarkup.ChecklistSpan { isChecked = ck.isChecked, rawStateCharIndex = ck.rawStateCharIndex, vContentStart = ck.vContentStart - segVisStart });
+
+                    if (tmp.Count > 0)
+                    {
+                        LinkMarkup.LayoutChecklistHitRects(new Rect(bodyR.x, curY, contentW, segH),
+                            bodyStyle, new GUIContent(segText), segMap, tmp);
+                        foreach (var t in tmp)
+                        {
+                            var real = _checks.Find(x => x.rawStateCharIndex == t.rawStateCharIndex);
+                            if (real != null) real.hitRects.AddRange(t.hitRects);
+                        }
+                    }
                 }
-                else
-                {
-                    maxX = Mathf.Max(maxX, b.x);
-                }
+
+                curY += segH;
             }
 
-            if (hasCurrent && maxX > minX)
-                li.hitRects.Add(new Rect(minX, curY, maxX - minX, lineH));
+            // 2) imagen o HR
+            if (im.src == "__HR__")
+            {
+                float hrW = contentW * 0.85f;
+                float hrX = bodyR.x + ((contentW - hrW) * 0.5f);
+                Rect hr = new Rect(hrX, curY + 4f, hrW, 1f);
+                EditorGUI.DrawRect(hr, new Color(1f, 1f, 1f, 0.15f));
+                curY += 1f + 8f;
+            }
+            else if (LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var _isExt) && tex != null)
+            {
+                float w = Mathf.Min(contentW, 200f);
+                float h = uv.width > 0f && uv.height > 0f
+                            ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
+                            : tex.height * (w / Mathf.Max(1f, (float)tex.width));
 
-            foreach (var r in li.hitRects)
-                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                float x = bodyR.x + ((contentW - w) * 0.5f);
+                var dest = new Rect(x, curY, w, h);
+
+                if (uv.width > 0f && uv.height > 0f && (uv.width != 1f || uv.height != 1f))
+                    GUI.DrawTextureWithTexCoords(dest, tex, uv);
+                else
+                    GUI.DrawTexture(dest, tex, ScaleMode.ScaleToFit, true);
+
+                _imgLayout.Add((im, tex, uv, 0f, w, h, dest));
+                curY += h;
+            }
+            else
+            {
+                curY += lineH;
+            }
+
+            // 3) saltar la línea del marcador
+            int lineEndStr = FindLineEndStr(lineStartStr);
+            curStr = lineEndStr;
+        }
+
+        // 4) resto de texto
+        if (curStr < full.Length)
+        {
+            string segText = full.Substring(curStr);
+            float segH = bodyStyle.CalcHeight(new GUIContent(segText), contentW);
+            GUI.Label(new Rect(bodyR.x, curY, contentW, segH), segText, bodyStyle);
+
+            var segMap = LinkMarkup.BuildVisibleIndexMapForIMGUI(segText);
+            int segVisStart = _indexMap.str2vis[curStr];
+            int segVisEnd = _indexMap.visibleLen;
+
+            // links
+            {
+                var tmp = new List<LinkMarkup.LinkSpan>();
+                foreach (var li in _links)
+                    if (li.vStart >= segVisStart && li.vEnd <= segVisEnd && li.vEnd > li.vStart)
+                        tmp.Add(new LinkMarkup.LinkSpan { name = li.name, id = li.id, vStart = li.vStart - segVisStart, vEnd = li.vEnd - segVisStart, isExternal = li.isExternal, isBroken = li.isBroken });
+
+                if (tmp.Count > 0)
+                {
+                    LinkMarkup.LayoutLinkHitRects(new Rect(bodyR.x, curY, contentW, segH),
+                        bodyStyle, new GUIContent(segText), segMap, tmp);
+                    foreach (var t in tmp)
+                    {
+                        var real = _links.Find(x => x.id == t.id && x.name == t.name &&
+                                                    x.vStart + segVisStart == t.vStart + segVisStart);
+                        if (real != null) real.hitRects.AddRange(t.hitRects);
+                    }
+                }
+            }
+            // checks
+            {
+                var tmp = new List<LinkMarkup.ChecklistSpan>();
+                foreach (var ck in _checks)
+                    if (ck.vContentStart >= segVisStart && ck.vContentStart < segVisEnd)
+                        tmp.Add(new LinkMarkup.ChecklistSpan { isChecked = ck.isChecked, rawStateCharIndex = ck.rawStateCharIndex, vContentStart = ck.vContentStart - segVisStart });
+
+                if (tmp.Count > 0)
+                {
+                    LinkMarkup.LayoutChecklistHitRects(new Rect(bodyR.x, curY, contentW, segH),
+                        bodyStyle, new GUIContent(segText), segMap, tmp);
+                    foreach (var t in tmp)
+                    {
+                        var real = _checks.Find(x => x.rawStateCharIndex == t.rawStateCharIndex);
+                        if (real != null) real.hitRects.AddRange(t.hitRects);
+                    }
+                }
+            }
         }
     }
 
-    void DrawLinkButtons()
+
+
+
+    float GetLineHeight(GUIStyle style)
+        => (style.lineHeight > 0f) ? style.lineHeight : style.CalcSize(new GUIContent("Ay")).y;
+
+    int GetLineStartIndex(string s, int strIndex)
     {
+        int p = Mathf.Clamp(strIndex, 0, (s != null ? s.Length : 0));
+        int nl = (s != null && p > 0) ? s.LastIndexOf('\n', p - 1) : -1;
+        return (nl < 0) ? 0 : (nl + 1);
+    }
+
+
+    void HandleLinksClicks()
+    {
+        var e = Event.current;
+
         foreach (var li in _links)
         {
             foreach (var r in li.hitRects)
             {
+                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+
+                if (e.type == EventType.MouseDown && e.button == 1 && r.Contains(e.mousePosition))
+                {
+                    NotesLinkActions.ShowContextMenu(li.name, li.id);
+                    e.Use(); return;
+                }
+
+                if (e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition))
+                {
+                    ActivateLink(li.id);
+                    e.Use(); return;
+                }
+
                 if (GUI.Button(r, GUIContent.none, GUIStyle.none))
                 {
-                    SelectLink(li);
+                    ActivateLink(li.id);
                     return;
                 }
             }
         }
     }
 
-    void HandleClickFallback(Rect bodyR)
+    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+    void HandleImageClicks()
     {
         var e = Event.current;
-        if (e.type != EventType.MouseUp || e.button != 0) return;
+        if (e.type != EventType.MouseDown) return;
 
-        int vClick = bodyStyle.GetCursorStringIndex(bodyR, bodyGC, e.mousePosition); // índice VISIBLE
-
-        foreach (var li in _links)
+        foreach (var it in _imgLayout)
         {
-            if (vClick >= li.vStart && vClick < li.vEnd)
+            if (it.img.src == "__HR__") continue; // HR no es interactivo
+
+            var r = it.drawRect;
+            if (!r.Contains(e.mousePosition)) continue;
+
+            if (e.button == 1)
             {
-                SelectLink(li);
-                e.Use();
-                return;
+                NotesLinkActions.ShowContextMenu("Imagen", it.img.src);
+                e.Use(); return;
+            }
+            if (e.button == 0)
+            {
+                ActivateLink(it.img.src); // SOLO ping
+                e.Use(); return;
             }
         }
     }
 
-    void SelectLink(LinkInfo li)
+
+    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+    void ActivateLink(string id)
     {
-        if (UnityEditor.GlobalObjectId.TryParse(li.id, out var goid))
+        if (NotesLinkActions.IsExternal(id)) { Application.OpenURL(id); return; }
+
+        var obj = NotesLinkActions.TryResolveAll(id);
+        if (obj != null)
         {
-            var obj = UnityEditor.GlobalObjectId.GlobalObjectIdentifierToObjectSlow(goid);
-            if (obj != null)
-            {
-                // NO cambiar selección. Solo ping.
-                var toPing = (obj is Component c) ? (UnityEngine.Object)c.gameObject : obj;
-                EditorGUIUtility.PingObject(toPing);
-            }
-            else
-            {
-                Debug.LogWarning($"No se pudo resolver el GlobalObjectId: {li.id}");
-            }
+            var toPing = (obj is Component c) ? (UnityEngine.Object)c.gameObject : obj;
+            EditorGUIUtility.PingObject(toPing);   // SOLO ping
         }
         else
         {
-            Debug.LogWarning($"Formato de GlobalObjectId inválido: {li.id}");
+            Debug.LogWarning($"Enlace no resuelto: {id}");
+        }
+    }
+
+
+    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+    void HandleChecklistClicks(Rect bodyR)
+    {
+        var e = Event.current;
+
+        var so = new SerializedObject(data);
+        var pNotes = so.FindProperty("notes");
+        string cur = pNotes.stringValue ?? string.Empty;
+
+        foreach (var ck in _checks)
+        {
+            foreach (var r in ck.hitRects)
+            {
+                bool newVal = GUI.Toggle(r, ck.isChecked, GUIContent.none);
+                if (newVal != ck.isChecked)
+                {
+                    string updated = LinkMarkup.ToggleChecklistAt(cur, ck.rawStateCharIndex, newVal);
+                    if (updated != cur)
+                    {
+                        Undo.RecordObject(data, "Toggle Checklist");
+                        pNotes.stringValue = updated;
+                        so.ApplyModifiedProperties();
+
+                        PrepareContent();
+                        CalculateSize();
+                        Repaint();
+                    }
+                    e.Use(); return;
+                }
+            }
         }
     }
 

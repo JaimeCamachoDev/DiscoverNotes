@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 
+[Icon("Assets/dep.jpg")]
 public class GameObjectNotes : MonoBehaviour
 {
     public enum DisplayMode { Edit = 0, Fixed = 1 }
