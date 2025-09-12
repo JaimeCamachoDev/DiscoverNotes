@@ -1,0 +1,10 @@
+{
+  "name": "com.jaimecamacho.discovernotes",
+  "version": "0.1.0",
+  "displayName": "Discover Notes",
+  "description": "Component for visual documentation notes in Unity.",
+  "unity": "2022.3",
+  "author": {
+    "name": "Jaime Camacho"
+  }
+}
