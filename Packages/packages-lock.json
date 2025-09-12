@@ -1,5 +1,18 @@
 {
   "dependencies": {
+    "com.jaimecamacho.discovernotes": {
+      "version": "file:com.jaimecamacho.discovernotes",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
+    "com.jaimecamacho.packagecreator": {
+      "version": "1.0.2",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://registry.npmjs.org"
+    },
     "com.unity.burst": {
       "version": "1.8.19",
       "depth": 2,
@@ -130,15 +143,6 @@
       "dependencies": {
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
-      }
-    },
-    "com.unity.visualeffectgraph": {
-      "version": "17.0.4",
-      "depth": 0,
-      "source": "builtin",
-      "dependencies": {
-        "com.unity.shadergraph": "17.0.4",
-        "com.unity.render-pipelines.core": "17.0.4"
       }
     },
     "com.unity.modules.imgui": {

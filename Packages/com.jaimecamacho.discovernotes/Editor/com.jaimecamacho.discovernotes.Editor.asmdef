@@ -1,0 +1,5 @@
+{
+  "name": "com.jaimecamacho.discovernotes.Editor",
+  "references": ["com.jaimecamacho.discovernotes.Runtime"],
+  "includePlatforms": ["Editor"]
+}

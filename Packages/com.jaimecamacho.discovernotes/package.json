@@ -1,0 +1,13 @@
+{
+  "author": "Jaime Camacho",
+  "displayName": "DiscoverNotes",
+  "keywords": [
+    "unity"
+  ],
+  "license": "MIT",
+  "name": "com.jaimecamacho.discovernotes",
+  "unity": "6000.0",
+  "unityRelease": "0f1",
+  "version": "1.0.0",
+  "description": "Es un componente de documentación visual en Unity para notas."
+}
