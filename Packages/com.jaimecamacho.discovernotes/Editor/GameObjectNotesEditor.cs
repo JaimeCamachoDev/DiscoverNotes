@@ -28,6 +28,9 @@ public class GameObjectNotesEditor : Editor
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
     private const int EDIT_MIN_LINES = 3;     // min visible
     private const int EDIT_MAX_LINES = 15;    // max visible
+                                              // Posición exacta del último clic en pantalla para el calendario
+    private Vector2? _calendarClickScreen;
+
     private Vector2 _editScroll;
 
     // Cache de vista fija (interpretada al dibujar)
@@ -228,17 +231,36 @@ public class GameObjectNotesEditor : Editor
         EditorIconHelper.DrawIconPopupAuthor(right, pAuthor, NoteStylesProvider.GetAuthors());
 
         var pDate = serializedObject.FindProperty("dateCreated");
-        // --- dentro de DrawEditableMeta() ---
+
+        // Fila del botón (igual que ya lo tenías)
         Rect row2 = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4);
         string label = string.IsNullOrEmpty(pDate.stringValue) ? DateTime.Now.ToString("dd/MM/yyyy") : pDate.stringValue;
 
+        // Capturamos LA POSICIÓN en el instante del clic (MouseDown) sobre este rect
+        var e = Event.current;
+        if (e.type == EventType.MouseDown && row2.Contains(e.mousePosition))
+        {
+            _calendarClickScreen = GUIUtility.GUIToScreenPoint(e.mousePosition);
+        }
+
+        // Botón de calendario
         if (GUI.Button(row2, new GUIContent(label, EditorIconHelper.GetCalendarIcon().image)))
         {
             DateTime initial = ParseDateOrToday(label);
 
-            // Anclar popup exactamente donde se hace clic
-            Vector2 mpScreen = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
-            var anchor = new Rect(mpScreen.x - 1f, mpScreen.y - 1f, 2f, 2f);
+            // Ancla: si tenemos la posición exacta del clic, usamos esa; si no, el borde inferior del botón
+            Rect anchor;
+            if (_calendarClickScreen.HasValue)
+            {
+                Vector2 p = _calendarClickScreen.Value;
+                anchor = new Rect(p.x, p.y, 1f, 1f);
+            }
+            else
+            {
+                Vector2 tl = GUIUtility.GUIToScreenPoint(new Vector2(row2.x, row2.y));
+                anchor = new Rect(tl.x + row2.width * 0.5f, tl.y + row2.height, 1f, 1f);
+            }
+            _calendarClickScreen = null;
 
             PopupWindow.Show(anchor, new CalendarPopup(initial, picked =>
             {
@@ -246,6 +268,7 @@ public class GameObjectNotesEditor : Editor
                 serializedObject.ApplyModifiedProperties();
             }));
         }
+
 
     }
 
@@ -443,7 +466,7 @@ public class GameObjectNotesEditor : Editor
         float padTop = collapsed ? 4f : PADDING;
         float padBot = collapsed ? 4f : PADDING;
         float padL = collapsed ? 8f : PADDING; // ← separa la cabecera del borde/acento izquierdo
-        float padR = collapsed ? 22f : PADDING; // ← separa botones del borde derecho
+        float padR = collapsed ? 12f : PADDING; // ← separa botones del borde derecho
 
         // Sin gap entre título y cuerpo si no hay cuerpo
         float titleGap = collapsed ? 0f : 4f;
@@ -522,7 +545,7 @@ public class GameObjectNotesEditor : Editor
 
         GUI.EndGroup();
     }
-// GameObjectNotesEditor.cs — Reemplaza COMPLETO este método:
+
     void RenderBodyWithInlineImages(PreviewCache cache, Rect bodyR)
     {
         foreach (var l in cache.links) l.hitRects.Clear();
@@ -698,6 +721,7 @@ public class GameObjectNotesEditor : Editor
 
 
 
+
     void DrawTooltipBackground(Rect r, Color bg, Color accent, bool accentLeft = false)
     {
         // Fondo
@@ -724,7 +748,6 @@ public class GameObjectNotesEditor : Editor
     }
 
 
-    // GameObjectNotesEditor.cs — Reemplaza COMPLETO este método:
     void ComputeImageLayout(PreviewCache cache, float innerW, GUIStyle bodyStyle, out float extraHeight)
     {
         cache.imgLayout.Clear();
@@ -762,6 +785,7 @@ public class GameObjectNotesEditor : Editor
     }
 
 
+
     float GetStyleLineHeight(GUIStyle style)
         => (style.lineHeight > 0f) ? style.lineHeight : style.CalcSize(new GUIContent("Ay")).y;
 
@@ -776,35 +800,64 @@ public class GameObjectNotesEditor : Editor
     void HandleLinksClicks(PreviewCache cache)
     {
         var e = Event.current;
+        if (cache == null || cache.links == null || cache.links.Count == 0) return;
+
+        int kLinkHash = "NotesLinkCtrl".GetHashCode();
 
         foreach (var li in cache.links)
         {
+            if (li == null || li.hitRects == null) continue;
+
             foreach (var r in li.hitRects)
             {
-                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                int id = GUIUtility.GetControlID(kLinkHash, FocusType.Passive, r);
+                var typeForCtrl = e.GetTypeForControl(id);
 
-                if (e.type == EventType.MouseDown && e.button == 1 && r.Contains(e.mousePosition))
-                {
-                    NotesLinkActions.ShowContextMenu(li.name, li.id);
-                    e.Use(); return;
-                }
+                if (typeForCtrl == EventType.Repaint)
+                    EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
 
-                if (e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition))
+                switch (typeForCtrl)
                 {
-                    PingLink(li.id);
-                    e.Use(); return;
-                }
+                    case EventType.MouseDown:
+                        if (!r.Contains(e.mousePosition)) break;
 
-                if (GUI.Button(r, GUIContent.none, GUIStyle.none))
-                {
-                    PingLink(li.id);
-                    return;
+                        if (e.button == 1)
+                        {
+                            NotesLinkActions.ShowContextMenu(li.name, li.id);
+                            GUIUtility.keyboardControl = 0;
+                            e.Use();
+                            return;
+                        }
+
+                        if (e.button == 0)
+                        {
+                            GUIUtility.hotControl = id;
+                            GUIUtility.keyboardControl = 0;
+                            e.Use();
+                            return;
+                        }
+                        break;
+
+                    case EventType.MouseDrag:
+                        if (GUIUtility.hotControl == id) e.Use();
+                        break;
+
+                    case EventType.MouseUp:
+                        if (GUIUtility.hotControl != id) break;
+
+                        GUIUtility.hotControl = 0;
+                        if (e.button == 0 && r.Contains(e.mousePosition))
+                        {
+                            PingLink(li.id); // Inspector: pingea/abre
+                        }
+                        e.Use();
+                        return;
                 }
             }
         }
     }
 
-    // GameObjectNotesEditor.cs — Reemplaza COMPLETO este método:
+
     void HandleImageClicks(PreviewCache cache)
     {
         var e = Event.current;
@@ -829,6 +882,7 @@ public class GameObjectNotesEditor : Editor
             }
         }
     }
+
 
 
     void PingLink(string id)
@@ -864,7 +918,6 @@ public class GameObjectNotesEditor : Editor
         }
     }
 
-    // GameObjectNotesEditor.cs — Reemplaza COMPLETO este método:
     void ToggleChecklistAtRawIndexRobust(SerializedProperty pNotes, int rawStateCharIndex, bool newStateChecked)
     {
         string cur = pNotes.stringValue ?? string.Empty;
@@ -876,6 +929,7 @@ public class GameObjectNotesEditor : Editor
         serializedObject.ApplyModifiedProperties();
         s_preview.Remove(tgt.GetInstanceID());
     }
+
 
 
     DateTime ParseDateOrToday(string s)

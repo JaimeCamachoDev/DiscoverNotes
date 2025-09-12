@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEditor;
+using System.Globalization; // ? nuevo
+
 
 /// Parser y layout de spans (links y checklists).
 /// - Enlaces: [texto](id|guid|GlobalObjectId|Assets/...|http|https|file)
@@ -79,14 +81,12 @@ public static class LinkMarkup
         @"(?m)^(?<indent>\s*(?:[-*]\s*)?)\[(?<state>[ xX])\](?<gap>\s*)(?<text>.*)$",
         RegexOptions.Compiled);
 
-    // ======= API principal (NUEVO INTÉRPRETE) =======
-    // LinkMarkup.cs  — Reemplaza COMPLETO este método:
     public static string BuildStyled(
-        string raw,
-        List<LinkSpan> linksOut,
-        List<ChecklistSpan> checksOut,
-        List<ImageSpan> imagesOut,
-        out VisibleIndexMap map)
+    string raw,
+    List<LinkSpan> linksOut,
+    List<ChecklistSpan> checksOut,
+    List<ImageSpan> imagesOut,
+    out VisibleIndexMap map)
     {
         linksOut?.Clear();
         checksOut?.Clear();
@@ -123,19 +123,6 @@ public static class LinkMarkup
             string keyword, param;
             ParseKeywordAndParam(tokenFull, out keyword, out param);
 
-            // HR: ahora es un separador real (se dibuja en los renderers)
-            if (string.Equals(keyword, "hr", StringComparison.OrdinalIgnoreCase))
-            {
-                images.Add(new ImageSpan
-                {
-                    src = "__HR__",               // marcador especial
-                    isExternal = false,
-                    strMarkerIndex = sb.Length
-                });
-                sb.Append("?"); // línea fantasma para el layout/índices visibles
-                i = rb + 1;
-                continue;
-            }
 
             int lp = (rb + 1 < raw.Length && raw[rb + 1] == '(') ? rb + 1 : -1;
             if (lp < 0)
@@ -203,18 +190,18 @@ public static class LinkMarkup
                         isChecked = (p == "1" || p == "true" || p == "x");
                     }
 
-                    string box = isChecked ? "? " : "? ";
+                    string box = "     ";
                     int contentStart = sb.Length + box.Length;
 
                     sb.Append(box);
-                    if (isChecked) sb.Append("<color=#888888>");
+                    if (isChecked) sb.Append("<color=#444>");
                     AppendTextWithLinksOnly(inner, sb, links, isChecked ? "#888888" : null);
                     if (isChecked) sb.Append("</color>");
 
                     checks.Add(new ChecklistSpan
                     {
                         isChecked = isChecked,
-                        rawStateCharIndex = b,   // usamos el índice del '[' original como referencia
+                        rawStateCharIndex = b,
                         strContentStart = contentStart
                     });
 
@@ -229,12 +216,13 @@ public static class LinkMarkup
                         isExternal = IsExternal(id),
                         strMarkerIndex = sb.Length
                     });
-                    sb.Append("?"); // marcador de línea
+                    // Para imágenes seguimos el marcador de línea mínima + salto
+                    sb.Append('\u200B');
+                    sb.Append('\n');
                     i = rp + 1; continue;
                 }
-                if (k == "tag") // NUEVO: reemplaza a [ping]
+                if (k == "tag")
                 {
-                    // Amarillo cálido
                     const string tagColor = "#FFD54A";
                     sb.Append("<b><color=").Append(tagColor).Append(">@");
                     AppendTextWithLinksOnly(inner, sb, links, tagColor);
@@ -242,7 +230,7 @@ public static class LinkMarkup
                     i = rp + 1; continue;
                 }
 
-                // Desconocido: dejar tal cual
+                // Desconocido ? literal
                 AppendTextWithLinksOnly(raw.Substring(b, rp - b + 1), sb, links, null);
                 i = rp + 1; continue;
             }
@@ -301,6 +289,8 @@ public static class LinkMarkup
 
         return styled;
     }
+
+
 
 
 
@@ -582,7 +572,6 @@ public static class LinkMarkup
     }
 
     // ==== Helper: palabra clave conocida? ====
-    // LinkMarkup.cs — Reemplaza COMPLETO este helper:
     static bool IsKeyword(string k)
     {
         if (string.IsNullOrEmpty(k)) return false;
@@ -596,8 +585,7 @@ public static class LinkMarkup
             case "check":
             case "checkx":
             case "img":
-            case "tag":   // <— NUEVO
-            case "hr":
+            case "tag":
                 return true;
             default:
                 return false;
@@ -828,7 +816,7 @@ public static class LinkMarkup
             float size = lineH;
 
             // Caja inmediatamente a la izquierda del texto, dejando el hueco pedido
-            float x = Mathf.Max(bodyR.x, a.x - (size + gapPx));
+            float x = Mathf.Max(bodyR.x+00f, a.x - (size + gapPx));
             Rect box = new Rect(x, a.y, size, size);
 
             ck.hitRects.Add(box);
@@ -924,7 +912,12 @@ public static class LinkMarkup
                 i += tagLen;
                 continue;
             }
-            map.str2vis[i] = v; i++; v++;
+
+            int j = NextGraphemeClusterBreak(map.text, i);
+
+            for (int k = i; k < j; k++) map.str2vis[k] = v; // todo el “grapheme” comparte v
+            i = j;
+            v++;
             vis2strList.Add(i);
         }
 
@@ -934,6 +927,51 @@ public static class LinkMarkup
         map.visibleLen = v;
         return map;
     }
+
+    static int NextGraphemeClusterBreak(string s, int i)
+    {
+        int n = s.Length;
+        int j = i;
+
+        // base (par sustituto o single)
+        if (j + 1 < n && char.IsHighSurrogate(s[j]) && char.IsLowSurrogate(s[j + 1])) j += 2;
+        else j += 1;
+
+        // VSxx (incluye VS16)
+        if (j < n && IsVariationSelector(s[j])) j++;
+
+        // diacríticos combinantes
+        while (j < n && IsCombiningMark(s[j])) j++;
+
+        // keycap U+20E3
+        if (j < n && s[j] == '\u20E3') j++;
+
+        // secuencias ZWJ (?????, ???????????, etc.)
+        while (j < n && s[j] == '\u200D')
+        {
+            j++; // consumir ZWJ
+
+            // siguiente base
+            if (j + 1 < n && char.IsHighSurrogate(s[j]) && char.IsLowSurrogate(s[j + 1])) j += 2;
+            else if (j < n) j++;
+
+            if (j < n && IsVariationSelector(s[j])) j++;
+            while (j < n && IsCombiningMark(s[j])) j++;
+            if (j < n && s[j] == '\u20E3') j++;
+        }
+
+        return j;
+    }
+
+    static bool IsVariationSelector(char c) => (c >= '\uFE00' && c <= '\uFE0F');
+    static bool IsCombiningMark(char c)
+    {
+        var cat = CharUnicodeInfo.GetUnicodeCategory(c);
+        return cat == UnicodeCategory.NonSpacingMark
+            || cat == UnicodeCategory.SpacingCombiningMark
+            || cat == UnicodeCategory.EnclosingMark;
+    }
+
 
     static int SafeStrToVis(VisibleIndexMap map, int strIndex)
     {

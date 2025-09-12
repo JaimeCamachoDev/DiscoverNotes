@@ -37,7 +37,7 @@ public static class NotesHierarchyHover
         if (go == null) return;
 
         var notesAll = go.GetComponents<GameObjectNotes>();
-        if (notesAll == null || notesAll.Length == 0) { CloseAll(unpinnedOnly: true); return; }
+        if (notesAll == null || notesAll.Length == 0) { return; }
 
         // Ancla: área del nombre con indent correcto
         var anchorLocalRect = selectionRect;

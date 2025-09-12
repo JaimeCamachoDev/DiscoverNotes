@@ -187,7 +187,6 @@ public class NotesTooltipWindow : EditorWindow
         return original.Substring(0, best) + "…";
     }
 
-    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
     void CalculateSize()
     {
         float screenW = Screen.currentResolution.width;
@@ -230,6 +229,7 @@ public class NotesTooltipWindow : EditorWindow
 
         boxH = titleH + textH + extra + PADDING * 2f + HEADER_STRIP + 6f;
     }
+
 
 
 
@@ -344,7 +344,6 @@ public class NotesTooltipWindow : EditorWindow
             Close();
     }
 
-    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
     void RenderBodyWithInlineImages(Rect bodyR)
     {
         foreach (var l in _links) l.hitRects.Clear();
@@ -523,6 +522,7 @@ public class NotesTooltipWindow : EditorWindow
 
 
 
+
     float GetLineHeight(GUIStyle style)
         => (style.lineHeight > 0f) ? style.lineHeight : style.CalcSize(new GUIContent("Ay")).y;
 
@@ -537,35 +537,71 @@ public class NotesTooltipWindow : EditorWindow
     void HandleLinksClicks()
     {
         var e = Event.current;
+        if (_links == null || _links.Count == 0) return;
 
-        foreach (var li in _links)
+        // Un hash estable para que cada rect obtenga siempre el mismo controlID en este frame
+        int kLinkHash = "NotesLinkCtrl".GetHashCode();
+
+        for (int i = 0; i < _links.Count; i++)
         {
-            foreach (var r in li.hitRects)
+            var li = _links[i];
+            if (li == null || li.hitRects == null) continue;
+
+            for (int j = 0; j < li.hitRects.Count; j++)
             {
-                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                Rect r = li.hitRects[j];
 
-                if (e.type == EventType.MouseDown && e.button == 1 && r.Contains(e.mousePosition))
-                {
-                    NotesLinkActions.ShowContextMenu(li.name, li.id);
-                    e.Use(); return;
-                }
+                // Control por-rect con ID estable
+                int id = GUIUtility.GetControlID(kLinkHash, FocusType.Passive, r);
+                var typeForCtrl = e.GetTypeForControl(id);
 
-                if (e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition))
-                {
-                    ActivateLink(li.id);
-                    e.Use(); return;
-                }
+                // Cursor sólo en Repaint para evitar sorpresas
+                if (typeForCtrl == EventType.Repaint)
+                    EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
 
-                if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+                switch (typeForCtrl)
                 {
-                    ActivateLink(li.id);
-                    return;
+                    case EventType.MouseDown:
+                        if (!r.Contains(e.mousePosition)) break;
+
+                        if (e.button == 1) // Contextual inmediato con RMB
+                        {
+                            NotesLinkActions.ShowContextMenu(li.name, li.id);
+                            GUIUtility.keyboardControl = 0;
+                            e.Use();
+                            return;
+                        }
+
+                        if (e.button == 0)
+                        {
+                            GUIUtility.hotControl = id; // Capturamos el ratón
+                            GUIUtility.keyboardControl = 0;
+                            e.Use();
+                            return;
+                        }
+                        break;
+
+                    case EventType.MouseDrag:
+                        if (GUIUtility.hotControl == id) e.Use(); // Evita que arrastres "a ningún sitio"
+                        break;
+
+                    case EventType.MouseUp:
+                        if (GUIUtility.hotControl != id) break;
+
+                        GUIUtility.hotControl = 0;
+                        // Activamos sólo si sueltas dentro del mismo rect (click real)
+                        if (e.button == 0 && r.Contains(e.mousePosition))
+                        {
+                            ActivateLink(li.id);
+                        }
+                        e.Use();
+                        return;
                 }
             }
         }
     }
 
-    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+
     void HandleImageClicks()
     {
         var e = Event.current;
@@ -592,7 +628,6 @@ public class NotesTooltipWindow : EditorWindow
     }
 
 
-    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
     void ActivateLink(string id)
     {
         if (NotesLinkActions.IsExternal(id)) { Application.OpenURL(id); return; }
@@ -610,7 +645,8 @@ public class NotesTooltipWindow : EditorWindow
     }
 
 
-    // NotesTooltipWindow.cs — Reemplaza COMPLETO este método:
+
+
     void HandleChecklistClicks(Rect bodyR)
     {
         var e = Event.current;
@@ -642,6 +678,7 @@ public class NotesTooltipWindow : EditorWindow
             }
         }
     }
+
 
 }
 #endif
