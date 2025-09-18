@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: NoteStyles
   m_EditorClassIdentifier: 
   authors:
+  - "An\xF3nimo"
+  - Avelino
   - Carlos
   - David
-  - Avelino
   - Gaspar
-  - "An\xF3nimo"
   categories:
   - name: Info
     icon: {fileID: 0}

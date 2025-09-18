@@ -30,6 +30,10 @@ public class NotesTooltipWindow : EditorWindow
 
     GUIContent _starIcon;
 
+    GameObjectNotes _owner;
+    int _noteIndex = -1;
+    GameObjectNotes.NoteData _noteData;
+
     Texture iconTex;
     GameObjectNotes data;
     GUIContent titleGC, bodyGC;
@@ -52,6 +56,19 @@ public class NotesTooltipWindow : EditorWindow
 
     List<(LinkMarkup.ImageSpan img, Texture2D tex, Rect uv, float extraBefore, float width, float height, Rect drawRect)> _imgLayout
         = new List<(LinkMarkup.ImageSpan, Texture2D, Rect, float, float, float, Rect)>();
+    // --- NUEVO: clamp por pantalla que contiene el anchor ---
+    Rect _clampRect;
+
+
+    // Reemplaza el uso de System.Windows.Forms por una alternativa compatible con Unity Editor.
+    // Sustituye el método GetClampRectForAnchor por una versión que solo usa APIs de Unity.
+
+    static Rect GetClampRectForAnchor(Rect anchorScreenRect, float margin)
+    {
+        // Fallback: rect de la ventana principal del Editor
+        var main = EditorGUIUtility.GetMainWindowPosition();
+        return new Rect(main.x + margin, main.y + margin, main.width - margin * 2f, main.height - margin * 2f);
+    }
 
     public static NotesTooltipWindow Create()
     {
@@ -96,29 +113,33 @@ public class NotesTooltipWindow : EditorWindow
     /// Muestra el tooltip para una nota. El texto subyacente SIEMPRE es plano;
     /// aquí se interpreta (links, checklists, imágenes) SOLO al render.
     /// </summary>
-    public void ShowFor(GameObjectNotes notes, Rect anchorScreenRect)
+    public void ShowFor(GameObjectNotes owner, GameObjectNotes.NoteData note, int noteIndex, Rect anchorScreenRect)
     {
-        bool targetChanged = _currentTargetId != notes.GetInstanceID();
-        if (targetChanged) { _currentTargetId = notes.GetInstanceID(); _sideLocked = false; }
+        bool targetChanged = _currentTargetId != owner.GetInstanceID() || _noteIndex != noteIndex;
+        if (targetChanged) { _currentTargetId = owner.GetInstanceID(); _sideLocked = false; }
 
         EnsureStyles();
-        data = notes;
+        _owner = owner;
+        _noteData = note;
+        _noteIndex = noteIndex;
 
-        var cat = NoteStylesProvider.FindCategory(data.Category);
+        var cat = NoteStylesProvider.FindCategory(_noteData.category);
         accent = cat != null ? cat.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f);
         bg = cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f);
         bg.a = 1f;
 
-        iconTex = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(data.Category)?.image);
+        iconTex = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(_noteData.category)?.image);
 
-        PrepareContent();   // <-- Interpretación en el momento de preparar contenido
-        CalculateSize();
+        PrepareContent_PerNote();
+        CalculateSize(); // (ver siguiente punto: ahora no usará Screen.currentResolution)
 
-        float screenW = Screen.currentResolution.width;
-        bool computedPlaceRight = (anchorScreenRect.xMax + ANCHOR_GAP + boxW) <= (screenW - SCREEN_MARGIN);
+        _clampRect = GetClampRectForAnchor(anchorScreenRect, SCREEN_MARGIN);
+
+        // Lado preferido en función del monitor del anchor
+        bool computedPlaceRight = (anchorScreenRect.xMax + ANCHOR_GAP + boxW) <= (_clampRect.xMax);
         if (!_sideLocked) { _sidePlaceRight = computedPlaceRight; _sideLocked = true; }
 
-        PositionWindow(anchorScreenRect, _sidePlaceRight);
+        PositionWindow(anchorScreenRect, _sidePlaceRight); // (ver siguiente punto)
 
         if (!hasFocus) ShowPopup();
         Repaint();
@@ -128,27 +149,28 @@ public class NotesTooltipWindow : EditorWindow
         wantsMouseMove = true;
     }
 
-    void PrepareContent()
+
+    void PrepareContent_PerNote()
     {
-        // El cuerpo siempre es texto plano. Se recorta por seguridad en tooltips.
-        string raw = (data.NotesText ?? string.Empty).Trim();
+        string raw = (_noteData?.notes ?? string.Empty).Trim();
         if (raw.Length > 2000) raw = raw.Substring(0, 2000) + "…";
 
-        string author = string.IsNullOrEmpty(data.Author) ? "Anónimo" : data.Author;
-        string date = string.IsNullOrEmpty(data.DateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : data.DateCreated;
-        string catName = string.IsNullOrEmpty(data.Category) ? "Nota" : data.Category;
+        string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
+        string date = string.IsNullOrEmpty(_noteData?.dateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : _noteData.dateCreated;
+        string catName = string.IsNullOrEmpty(_noteData?.category) ? "Nota" : _noteData.category;
 
         float screenW = Screen.currentResolution.width;
-        float maxTitleW = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f) - PIN_RESERVE);
+        float maxTitleW = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f));
+
         titleGC = new GUIContent(BuildOneLineTitle(catName, author, date, maxTitleW, titleStyle));
 
-        // === Interpretación modular (en tiempo de dibujo) ===
         _links.Clear(); _checks.Clear(); _images.Clear();
         string styled = LinkMarkup.BuildStyled(raw, _links, _checks, _images, out _indexMap);
         bodyGC = new GUIContent(styled);
 
         _imgLayout.Clear();
     }
+
 
     string BuildOneLineTitle(string category, string author, string date, float maxW, GUIStyle st)
     {
@@ -189,7 +211,7 @@ public class NotesTooltipWindow : EditorWindow
 
     void CalculateSize()
     {
-        float screenW = Screen.currentResolution.width;
+        float screenW = (_clampRect.width > 0f ? _clampRect.width : EditorGUIUtility.currentViewWidth);
 
         Vector2 ts = titleStyle.CalcSize(titleGC);
         float titleW = ts.x;
@@ -199,19 +221,21 @@ public class NotesTooltipWindow : EditorWindow
 
         boxW = Mathf.Clamp(
             (iconTex != null ? (ICON + ICON_PAD) : 0f) + Mathf.Max(titleW, bodyPrefW) + PADDING * 2f + PIN_RESERVE,
-            MIN_W, Mathf.Min(MAX_W, screenW - SCREEN_MARGIN * 2f)
+            MIN_W, Mathf.Min(MAX_W, screenW)
         );
 
-        float innerW = boxW - PADDING * 2f - PIN_RESERVE;
+        float innerW = boxW - PADDING * 2f;
         float textH = bodyStyle.CalcHeight(bodyGC, innerW);
 
         float extra = 0f;
         float lineH = GetLineHeight(bodyStyle);
+        const float IMG_VPAD = 15f;
+
         foreach (var im in _images)
         {
             if (im.src == "__HR__")
             {
-                float h = 1f + 8f; // línea + padding vertical del render
+                float h = 1f + 8f;
                 extra += (h - lineH);
                 continue;
             }
@@ -219,18 +243,37 @@ public class NotesTooltipWindow : EditorWindow
             if (!LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var isExternal) || tex == null)
                 continue;
 
-            float w = Mathf.Min(innerW, 200f);
-            float h2 = uv.width > 0f && uv.height > 0f
-                        ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
-                        : tex.height * (w / Mathf.Max(1f, (float)tex.width));
+            // Si hay altura fija, no limitamos a 200: usamos innerW.
+            float maxW = (im.height > 0f) ? innerW : Mathf.Min(innerW, 200f);
 
-            extra += (h2 - lineH);
+            float aspect = (uv.width > 0f && uv.height > 0f)
+                ? (uv.height / Mathf.Max(0.0001f, uv.width))
+                : ((float)tex.height / Mathf.Max(1f, (float)tex.width));
+
+            float w, h2;
+            if (im.height > 0f)
+            {
+                h2 = im.height;
+                w = h2 / Mathf.Max(0.0001f, aspect);
+
+                if (w > maxW)
+                {
+                    float s = maxW / w;
+                    w = maxW;
+                    h2 = Mathf.Max(1f, h2 * s);
+                }
+            }
+            else
+            {
+                w = maxW;
+                h2 = maxW * aspect;
+            }
+
+            extra += (h2 - lineH) + IMG_VPAD;
         }
 
         boxH = titleH + textH + extra + PADDING * 2f + HEADER_STRIP + 6f;
     }
-
-
 
 
     float MeasureBodyPreferredWidth(string body)
@@ -249,21 +292,21 @@ public class NotesTooltipWindow : EditorWindow
 
     void PositionWindow(Rect anchor, bool placeRight)
     {
-        float screenW = Screen.currentResolution.width;
-        float screenH = Screen.currentResolution.height;
-        bool flipUp = (anchor.yMax + 2f + boxH) > (screenH - SCREEN_MARGIN);
+        // flip en vertical según el clamp del monitor
+        bool flipUp = (anchor.yMax + 2f + boxH) > (_clampRect.yMax);
 
         float x = placeRight ? (anchor.xMax + ANCHOR_GAP) : (anchor.xMin - boxW - ANCHOR_GAP);
         float y = flipUp ? (anchor.y - boxH - 2f) : (anchor.yMax + 2f);
 
-        x = Mathf.Clamp(x, SCREEN_MARGIN, screenW - boxW - SCREEN_MARGIN);
-        y = Mathf.Clamp(y, SCREEN_MARGIN, screenH - boxH - SCREEN_MARGIN);
+        x = Mathf.Clamp(x, _clampRect.x, _clampRect.xMax - boxW);
+        y = Mathf.Clamp(y, _clampRect.y, _clampRect.yMax - boxH);
 
         var r = new Rect(Mathf.Floor(x), Mathf.Floor(y), Mathf.Ceil(boxW), Mathf.Ceil(boxH));
         position = r;
         minSize = new Vector2(r.width, r.height);
         maxSize = new Vector2(r.width, r.height);
     }
+
 
     void Update()
     {
@@ -330,8 +373,8 @@ public class NotesTooltipWindow : EditorWindow
         if (GUI.Button(pinRect, _starIcon ?? new GUIContent("★"), GUIStyle.none)) { _pinned = !_pinned; Repaint(); }
         GUI.color = prev;
 
-        // Cuerpo (alineado a cabecera; restamos pin)
-        var bodyR = new Rect(inner.x, inner.y + titleH + 4f, inner.width - PIN_RESERVE, inner.height - titleH - 4f);
+        // Cuerpo: usa TODO el ancho. La cabecera ya reservó la chincheta.
+        var bodyR = new Rect(inner.x, inner.y + titleH + 4f, inner.width, inner.height - titleH - 4f);
 
         // === NUEVO: render segmentado con imágenes inline (izquierda) y zonas clickables correctas ===
         RenderBodyWithInlineImages(bodyR);
@@ -358,7 +401,8 @@ public class NotesTooltipWindow : EditorWindow
         float curY = bodyR.y;
         int curStr = 0;
 
-        float contentW = bodyR.width;
+        float contentW = Mathf.Max(0f, Mathf.Floor(bodyR.width));
+        float contentX = Mathf.Floor(bodyR.x);
         float lineH = GetLineHeight(bodyStyle);
 
         int FindLineStartStr(int strIdx)
@@ -375,7 +419,6 @@ public class NotesTooltipWindow : EditorWindow
 
         foreach (var im in orderedImgs)
         {
-            // 1) texto previo
             int segStartStr = curStr;
             int lineStartStr = FindLineStartStr(im.strMarkerIndex);
 
@@ -390,7 +433,6 @@ public class NotesTooltipWindow : EditorWindow
                 int segVisStart = _indexMap.str2vis[segStartStr];
                 int segVisEnd = _indexMap.str2vis[lineStartStr];
 
-                // links
                 {
                     var tmp = new List<LinkMarkup.LinkSpan>();
                     foreach (var li in _links)
@@ -409,7 +451,6 @@ public class NotesTooltipWindow : EditorWindow
                         }
                     }
                 }
-                // checks
                 {
                     var tmp = new List<LinkMarkup.ChecklistSpan>();
                     foreach (var ck in _checks)
@@ -431,7 +472,6 @@ public class NotesTooltipWindow : EditorWindow
                 curY += segH;
             }
 
-            // 2) imagen o HR
             if (im.src == "__HR__")
             {
                 float hrW = contentW * 0.85f;
@@ -442,12 +482,33 @@ public class NotesTooltipWindow : EditorWindow
             }
             else if (LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var _isExt) && tex != null)
             {
-                float w = Mathf.Min(contentW, 200f);
-                float h = uv.width > 0f && uv.height > 0f
-                            ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
-                            : tex.height * (w / Mathf.Max(1f, (float)tex.width));
+                // Antes 200px; ahora, si hay altura fija, usamos contentW completo.
+                float maxW = (im.height > 0f) ? contentW : Mathf.Min(contentW, 200f);
 
-                float x = bodyR.x + ((contentW - w) * 0.5f);
+                float aspect = (uv.width > 0f && uv.height > 0f)
+                    ? (uv.height / Mathf.Max(0.0001f, uv.width))
+                    : ((float)tex.height / Mathf.Max(1f, (float)tex.width));
+
+                float w, h;
+                if (im.height > 0f)
+                {
+                    h = im.height;
+                    w = h / Mathf.Max(0.0001f, aspect);
+
+                    if (w > maxW)
+                    {
+                        float s = maxW / w;
+                        w = maxW;
+                        h = Mathf.Max(1f, h * s);
+                    }
+                }
+                else
+                {
+                    w = maxW;
+                    h = maxW * aspect;
+                }
+
+                float x = Mathf.Round(contentX + ((contentW - w) * 0.5f));
                 var dest = new Rect(x, curY, w, h);
 
                 if (uv.width > 0f && uv.height > 0f && (uv.width != 1f || uv.height != 1f))
@@ -463,12 +524,10 @@ public class NotesTooltipWindow : EditorWindow
                 curY += lineH;
             }
 
-            // 3) saltar la línea del marcador
             int lineEndStr = FindLineEndStr(lineStartStr);
             curStr = lineEndStr;
         }
 
-        // 4) resto de texto
         if (curStr < full.Length)
         {
             string segText = full.Substring(curStr);
@@ -479,7 +538,6 @@ public class NotesTooltipWindow : EditorWindow
             int segVisStart = _indexMap.str2vis[curStr];
             int segVisEnd = _indexMap.visibleLen;
 
-            // links
             {
                 var tmp = new List<LinkMarkup.LinkSpan>();
                 foreach (var li in _links)
@@ -498,7 +556,6 @@ public class NotesTooltipWindow : EditorWindow
                     }
                 }
             }
-            // checks
             {
                 var tmp = new List<LinkMarkup.ChecklistSpan>();
                 foreach (var ck in _checks)
@@ -518,10 +575,6 @@ public class NotesTooltipWindow : EditorWindow
             }
         }
     }
-
-
-
-
 
     float GetLineHeight(GUIStyle style)
         => (style.lineHeight > 0f) ? style.lineHeight : style.CalcSize(new GUIContent("Ay")).y;
@@ -651,9 +704,13 @@ public class NotesTooltipWindow : EditorWindow
     {
         var e = Event.current;
 
-        var so = new SerializedObject(data);
-        var pNotes = so.FindProperty("notes");
-        string cur = pNotes.stringValue ?? string.Empty;
+        var so = new SerializedObject(_owner);
+        var pList = so.FindProperty("notesList");
+        if (pList == null || _noteIndex < 0 || _noteIndex >= pList.arraySize) return;
+
+        var pNote = pList.GetArrayElementAtIndex(_noteIndex);
+        var pBody = pNote.FindPropertyRelative("notes");
+        string cur = pBody.stringValue ?? string.Empty;
 
         foreach (var ck in _checks)
         {
@@ -665,11 +722,10 @@ public class NotesTooltipWindow : EditorWindow
                     string updated = LinkMarkup.ToggleChecklistAt(cur, ck.rawStateCharIndex, newVal);
                     if (updated != cur)
                     {
-                        Undo.RecordObject(data, "Toggle Checklist");
-                        pNotes.stringValue = updated;
+                        Undo.RecordObject(_owner, "Toggle Checklist");
+                        pBody.stringValue = updated;
                         so.ApplyModifiedProperties();
-
-                        PrepareContent();
+                        PrepareContent_PerNote();
                         CalculateSize();
                         Repaint();
                     }
@@ -678,6 +734,7 @@ public class NotesTooltipWindow : EditorWindow
             }
         }
     }
+
 
 
 }

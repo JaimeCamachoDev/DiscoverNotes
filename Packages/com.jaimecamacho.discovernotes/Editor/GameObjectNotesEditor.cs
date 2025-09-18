@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using System.Text.RegularExpressions;
+
 
 [CustomEditor(typeof(GameObjectNotes))]
 public class GameObjectNotesEditor : Editor
@@ -66,39 +68,62 @@ public class GameObjectNotesEditor : Editor
         EnsureStyles();
         serializedObject.Update();
 
-        var pMode = serializedObject.FindProperty("displayMode");
-        var mode = (GameObjectNotes.DisplayMode)pMode.enumValueIndex;
-
-        if (mode == GameObjectNotes.DisplayMode.Edit)
+        // Lista de notas
+        var pList = serializedObject.FindProperty("notesList");
+        if (pList == null)
         {
-            // Fondo de edición = tooltipBackground + barrita de acento
-            var catEdit = NoteStylesProvider.FindCategory(tgt.Category);
-            var bg = catEdit != null ? catEdit.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f);
-            var accent = catEdit != null ? catEdit.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f);
-            bg.a = 1f;
+            EditorGUILayout.HelpBox("Este componente usa varias notas. Vuelve a compilar si acabas de actualizar el script.", MessageType.Info);
+            serializedObject.ApplyModifiedProperties();
+            return;
+        }
 
-            if (lastCardBg != bg)
+        if (pList.arraySize == 0)
+        {
+            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → “Añadir nota”.", MessageType.Info);
+        }
+
+        // Dibuja cada nota como una tarjeta independiente
+        for (int i = 0; i < pList.arraySize; i++)
+        {
+            var pNote = pList.GetArrayElementAtIndex(i);
+            var pMode = pNote.FindPropertyRelative("displayMode");
+            var mode = (GameObjectNotes.DisplayMode)pMode.enumValueIndex;
+
+            GUILayout.Space(6);
+
+            if (mode == GameObjectNotes.DisplayMode.Edit)
             {
-                solidTex.SetPixel(0, 0, bg);
-                solidTex.Apply(false, false);
-                lastCardBg = bg;
+                // Fondo de edición (como ahora)
+                var catEdit = NoteStylesProvider.FindCategory(pNote.FindPropertyRelative("category").stringValue);
+                var bg = catEdit != null ? catEdit.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f);
+                bg.a = 1f;
+                if (lastCardBg != bg)
+                {
+                    solidTex.SetPixel(0, 0, bg);
+                    solidTex.Apply(false, false);
+                    lastCardBg = bg;
+                }
+
+                GUILayout.BeginVertical(cardStyle);
+
+                DrawHeaderToolbar_PerNote(pMode, showTitle: true);
+                DrawEditableMeta_PerNote(pNote);
+                DrawEditableNotes_PlainAutoHeight_PerNote(pNote, i);
+
+                GUILayout.EndVertical();
+            }
+            else
+            {
+                DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
             }
 
-            GUILayout.BeginVertical(cardStyle);
+            GUILayout.Space(4);
 
-            DrawHeaderToolbar(pMode, true);
-            DrawEditableMeta();
-            DrawEditableNotes_PlainAutoHeight();
-
-            GUILayout.EndVertical();
-        }
-        else
-        {
-            DrawFixedLikeTooltip_WithCollapse_AndRich(pMode); // <-- interpretación al render
         }
 
         serializedObject.ApplyModifiedProperties();
     }
+
 
     // ---------- Estilos ----------
     void EnsureStyles()
@@ -169,11 +194,11 @@ public class GameObjectNotesEditor : Editor
     }
 
     // ---------- Header ----------
-    void DrawHeaderToolbar(SerializedProperty pMode, bool showTitle)
+    void DrawHeaderToolbar_PerNote(SerializedProperty pMode, bool showTitle)
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (showTitle) EditorGUILayout.LabelField("Notas", EditorStyles.boldLabel);
+            if (showTitle) EditorGUILayout.LabelField("Nota", EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
 
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
@@ -186,14 +211,18 @@ public class GameObjectNotesEditor : Editor
 
             if (GUI.Button(r, content, squareIconBtn))
             {
-                pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed : (int)GameObjectNotes.DisplayMode.Edit;
+                pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed
+                                              : (int)GameObjectNotes.DisplayMode.Edit;
                 serializedObject.ApplyModifiedProperties();
                 GUI.FocusControl(null);
-                s_preview.Remove(tgt.GetInstanceID());
+                // Limpia caché sólo de esta nota
+                int key = NoteCacheKey(tgt.GetInstanceID(), pMode.propertyPath);
+                s_preview.Remove(key);
             }
         }
         GUILayout.Space(4);
     }
+
 
     GUIContent GetModeLockIcon(bool isEditNow)
     {
@@ -213,10 +242,11 @@ public class GameObjectNotesEditor : Editor
     }
 
     // ---------- Meta ----------
-    void DrawEditableMeta()
+    void DrawEditableMeta_PerNote(SerializedProperty pNote)
     {
-        var pAuthor = serializedObject.FindProperty("author");
-        var pCategory = serializedObject.FindProperty("category");
+        var pAuthor = pNote.FindPropertyRelative("author");
+        var pCategory = pNote.FindPropertyRelative("category");
+        var pDate = pNote.FindPropertyRelative("dateCreated");
 
         float rowH = Mathf.Max(EditorGUIUtility.singleLineHeight + 6f, 22f);
         Rect row = EditorGUILayout.GetControlRect(false, rowH);
@@ -230,25 +260,17 @@ public class GameObjectNotesEditor : Editor
         EditorIconHelper.DrawIconPopupCategory(left, pCategory, NoteStylesProvider.GetCategoryNames());
         EditorIconHelper.DrawIconPopupAuthor(right, pAuthor, NoteStylesProvider.GetAuthors());
 
-        var pDate = serializedObject.FindProperty("dateCreated");
-
-        // Fila del botón (igual que ya lo tenías)
+        // Botón fecha con popup anclado al click real
         Rect row2 = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4);
         string label = string.IsNullOrEmpty(pDate.stringValue) ? DateTime.Now.ToString("dd/MM/yyyy") : pDate.stringValue;
 
-        // Capturamos LA POSICIÓN en el instante del clic (MouseDown) sobre este rect
         var e = Event.current;
         if (e.type == EventType.MouseDown && row2.Contains(e.mousePosition))
-        {
             _calendarClickScreen = GUIUtility.GUIToScreenPoint(e.mousePosition);
-        }
 
-        // Botón de calendario
         if (GUI.Button(row2, new GUIContent(label, EditorIconHelper.GetCalendarIcon().image)))
         {
             DateTime initial = ParseDateOrToday(label);
-
-            // Ancla: si tenemos la posición exacta del clic, usamos esa; si no, el borde inferior del botón
             Rect anchor;
             if (_calendarClickScreen.HasValue)
             {
@@ -268,52 +290,43 @@ public class GameObjectNotesEditor : Editor
                 serializedObject.ApplyModifiedProperties();
             }));
         }
-
-
     }
 
+
     // ---------- Edición: TextArea PLANA (min/max líneas + ScrollView) ----------
-    void DrawEditableNotes_PlainAutoHeight()
+    void DrawEditableNotes_PlainAutoHeight_PerNote(SerializedProperty pNote, int noteIndex)
     {
-        var pNotes = serializedObject.FindProperty("notes");
-        EditorGUILayout.LabelField("Contenido (texto plano; se interpreta solo al mostrar)", EditorStyles.boldLabel);
+        var pBody = pNote.FindPropertyRelative("notes");
+        EditorGUILayout.LabelField("Contenido (texto plano; se interpreta al mostrar)", EditorStyles.boldLabel);
 
-        string text = pNotes.stringValue ?? string.Empty;
-
-        // Ancho estable: restamos un margen típico del inspector para evitar 0 y jitter
+        string text = pBody.stringValue ?? string.Empty;
         float viewW = Mathf.Max(100f, EditorGUIUtility.currentViewWidth - 36f);
-
-        // Altura exacta del contenido (sin mínimos ni máximos, sin scroll externo)
-        // Nota: usamos " " si está vacío para que CalcHeight no devuelva 0.
         float targetH = notesAreaStyle.CalcHeight(new GUIContent(string.IsNullOrEmpty(text) ? " " : text), viewW);
 
-        // Reservamos el rect ya con la altura calculada (esto evita 0,0)
         Rect areaRect = EditorGUILayout.GetControlRect(false, targetH, GUILayout.ExpandWidth(true));
 
-        ArmUndoIfTyping(areaRect);
+        string controlName = $"{NotesControlName}_{noteIndex}";
+        ArmUndoIfTyping_PerNote(areaRect, controlName);
 
-        GUI.SetNextControlName(NotesControlName);
+        GUI.SetNextControlName(controlName);
         EditorGUI.BeginChangeCheck();
         string after = EditorGUI.TextArea(areaRect, text, notesAreaStyle);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(tgt, "Edit Notes");
-            pNotes.stringValue = after;
+            pBody.stringValue = after;
             serializedObject.ApplyModifiedProperties();
         }
 
-        // DnD sigue funcionando, insertando como texto plano
-        HandleDragAndDropIntoTextArea(areaRect, pNotes);
-
+        HandleDragAndDropIntoTextArea(areaRect, pBody);
         if (Event.current.type == EventType.ExecuteCommand && Event.current.commandName == "UndoRedoPerformed")
             Repaint();
     }
 
-
-    void ArmUndoIfTyping(Rect areaRect)
+    void ArmUndoIfTyping_PerNote(Rect areaRect, string controlName)
     {
         var e = Event.current;
-        bool focused = GUI.GetNameOfFocusedControl() == NotesControlName;
+        bool focused = GUI.GetNameOfFocusedControl() == controlName;
         if (!focused) return;
 
         bool isKeyEvt = (e.type == EventType.KeyDown);
@@ -321,7 +334,7 @@ public class GameObjectNotesEditor : Editor
             (e.type == EventType.ExecuteCommand || e.type == EventType.ValidateCommand) &&
             (e.commandName == "Paste" || e.commandName == "Cut" || e.commandName == "Delete" || e.commandName == "Duplicate");
 
-        if ((isKeyEvt || isEditCmd))
+        if (isKeyEvt || isEditCmd)
         {
             int evtId = e.GetHashCode();
             if (evtId != s_lastUndoEventId)
@@ -331,6 +344,7 @@ public class GameObjectNotesEditor : Editor
             }
         }
     }
+
 
     void HandleDragAndDropIntoTextArea(Rect areaRect, SerializedProperty pNotes)
     {
@@ -399,25 +413,24 @@ public class GameObjectNotesEditor : Editor
         return obj.name ?? "(objeto)";
     }
 
-    void DrawFixedLikeTooltip_WithCollapse_AndRich(SerializedProperty pMode)
+    void DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(SerializedProperty pNote, int noteIndex)
     {
-        var cat = NoteStylesProvider.FindCategory(tgt.Category);
+        string category = pNote.FindPropertyRelative("category").stringValue ?? "Info";
+        string author = pNote.FindPropertyRelative("author").stringValue;
+        string date = pNote.FindPropertyRelative("dateCreated").stringValue;
+        var pBody = pNote.FindPropertyRelative("notes");
+        string raw = pBody.stringValue ?? string.Empty;
+
+        var cat = NoteStylesProvider.FindCategory(category);
         var bg = (cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f));
         var accent = (cat != null ? cat.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f));
         bg.a = 1f;
 
-        string author = string.IsNullOrEmpty(tgt.Author) ? "Anónimo" : tgt.Author;
-        string date = string.IsNullOrEmpty(tgt.DateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : tgt.DateCreated;
-        string catName = string.IsNullOrEmpty(tgt.Category) ? "Nota" : tgt.Category;
-
-        var pNotes = serializedObject.FindProperty("notes");
-        string raw = pNotes.stringValue ?? string.Empty;
-
-        int id = tgt.GetInstanceID();
-        if (!s_preview.TryGetValue(id, out var cache)) { cache = new PreviewCache(); s_preview[id] = cache; }
+        int key = NoteCacheKey(tgt.GetInstanceID(), pNote.propertyPath);
+        if (!s_preview.TryGetValue(key, out var cache)) { cache = new PreviewCache(); s_preview[key] = cache; }
 
         int textHash = raw.GetHashCode();
-        int metaHash = (catName + "|" + author + "|" + date).GetHashCode();
+        int metaHash = (category + "|" + author + "|" + date).GetHashCode();
         float availWidth = EditorGUIUtility.currentViewWidth - 20f;
         if (availWidth <= 0f) availWidth = 400f;
 
@@ -431,8 +444,8 @@ public class GameObjectNotesEditor : Editor
             cache.bg = bg;
             cache.accent = accent;
 
-            cache.icon = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(tgt.Category)?.image);
-            cache.titleGC = new GUIContent($"<b>{catName}</b>  •  {author}  •  {date}");
+            cache.icon = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(category)?.image);
+            cache.titleGC = new GUIContent($"<b>{category}</b>  •  {(string.IsNullOrEmpty(author) ? "Anónimo" : author)}  •  {(string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date)}");
 
             cache.links.Clear(); cache.checks.Clear(); cache.images.Clear();
             string displayStyled = LinkMarkup.BuildStyled(raw, cache.links, cache.checks, cache.images, out cache.indexMap);
@@ -452,73 +465,62 @@ public class GameObjectNotesEditor : Editor
             cache.innerWidth = innerW;
         }
 
-        // === COMPACTAR cuando está oculto ===
-        bool collapsed = s_fixedBodyCollapsed.TryGetValue(id, out var v) && v;
+        bool collapsed = s_fixedBodyCollapsed.TryGetValue(key, out var v) && v;
 
-        // Tipos y paddings más pequeños
         ttTitleStyle.fontSize = collapsed ? 12 : 13;
         ttBodyStyle.fontSize = collapsed ? 11 : 12;
 
-        // Si el acento va a la izquierda, no reservamos altura de cabecera
-        float headerH = collapsed ? 0f : HEADER_STRIP;
+        // En colapsado forzamos altura compacta de una línea para el título
+        float titleLineH = Mathf.Max(16f, GetStyleLineHeight(ttTitleStyle));
+        float titleH = collapsed ? Mathf.Max(titleLineH, (cache.icon != null ? ICON : 0f)) : cache.titleH;
 
-        // Paddings: más compactos y con margen extra a la izquierda/derecha solo en colapsado
+        float headerH = collapsed ? 0f : HEADER_STRIP;
         float padTop = collapsed ? 4f : PADDING;
         float padBot = collapsed ? 4f : PADDING;
-        float padL = collapsed ? 8f : PADDING; // ← separa la cabecera del borde/acento izquierdo
-        float padR = collapsed ? 12f : PADDING; // ← separa botones del borde derecho
-
-        // Sin gap entre título y cuerpo si no hay cuerpo
+        float padL = collapsed ? 8f : PADDING;
+        float padR = collapsed ? 12f : PADDING;
         float titleGap = collapsed ? 0f : 4f;
-
         float effectiveBodyH = collapsed ? 0f : cache.bodyH;
-        float totalH = headerH + padTop + padBot + cache.titleH + titleGap + effectiveBodyH;
+        float totalH = headerH + padTop + padBot + titleH + titleGap + effectiveBodyH;
 
         Rect outer = GUILayoutUtility.GetRect(0, totalH, GUILayout.ExpandWidth(true));
         if (outer.width <= 1f) return;
 
         GUI.BeginGroup(outer);
-
-        // Acento a la izquierda si está colapsado
         DrawTooltipBackground(new Rect(0, 0, outer.width, totalH), cache.bg, cache.accent, accentLeft: collapsed);
 
         ttTitleStyle.normal.textColor = cache.preferDark ? Color.black : Color.white;
         ttBodyStyle.normal.textColor = cache.preferDark ? new Color(0.12f, 0.12f, 0.12f, 1f)
-                                                          : new Color(0.95f, 0.95f, 0.97f, 1f);
+                                                         : new Color(0.95f, 0.95f, 0.97f, 1f);
 
-        // ← inner ahora usa padL / padR asimétricos
-        Rect inner = new Rect(
-            padL,
-            padTop + headerH,
-            outer.width - padL - padR,
-            totalH - padTop - padBot - headerH
-        );
+        Rect inner = new Rect(padL, padTop + headerH, outer.width - padL - padR, totalH - padTop - padBot - headerH);
 
-        // Título
-        Rect titleR = new Rect(inner.x, inner.y, inner.width, cache.titleH);
+        Rect titleR = new Rect(inner.x, inner.y, inner.width, titleH);
         if (cache.icon != null)
         {
-            var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((cache.titleH - ICON) * 0.5f), ICON, ICON);
+            var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((titleH - ICON) * 0.5f), ICON, ICON);
             GUI.DrawTexture(iconR, cache.icon, ScaleMode.ScaleToFit, true);
             titleR.x += ICON + ICON_PAD;
             titleR.width -= ICON + ICON_PAD;
         }
 
-        // Botones (respetan padR al calcularse desde 'inner')
+        // Botonera (candado + colapso)
         {
-            bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
+            bool isEdit = pNote.FindPropertyRelative("displayMode").enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
             const float BTN = 20f;
             float btnX = inner.x + inner.width - BTN;
 
             var lockIcon = GetModeLockIcon(isEdit);
-            Rect lockR = new Rect(btnX, titleR.y + Mathf.Floor((cache.titleH - BTN) * 0.5f), BTN, BTN);
+            Rect lockR = new Rect(btnX, titleR.y + Mathf.Floor((titleH - BTN) * 0.5f), BTN, BTN);
             EditorGUIUtility.AddCursorRect(lockR, MouseCursor.Link);
             if (GUI.Button(lockR, new GUIContent(lockIcon.image, isEdit ? "Fijar" : "Editar"), squareIconBtn))
             {
-                pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed : (int)GameObjectNotes.DisplayMode.Edit;
+                pNote.FindPropertyRelative("displayMode").enumValueIndex = isEdit
+                    ? (int)GameObjectNotes.DisplayMode.Fixed
+                    : (int)GameObjectNotes.DisplayMode.Edit;
                 serializedObject.ApplyModifiedProperties();
                 GUI.FocusControl(null);
-                s_preview.Remove(tgt.GetInstanceID());
+                s_preview.Remove(key);
             }
 
             btnX -= (BTN + 6f);
@@ -526,25 +528,193 @@ public class GameObjectNotesEditor : Editor
             Rect colR = new Rect(btnX, lockR.y, BTN, BTN);
             EditorGUIUtility.AddCursorRect(colR, MouseCursor.Link);
             if (GUI.Button(colR, new GUIContent(collapseIcon?.image, collapsed ? "Mostrar cuerpo" : "Ocultar cuerpo"), squareIconBtn))
-                s_fixedBodyCollapsed[id] = !collapsed;
+                s_fixedBodyCollapsed[key] = !collapsed;
 
             titleR.width -= (BTN * 2f + 12f);
         }
 
-
-        GUI.Label(titleR, cache.titleGC, ttTitleStyle);
-
-        if (!collapsed)
+        // Título + Teaser en una sola línea cuando está colapsado
+        if (collapsed)
         {
-            Rect bodyR = new Rect(inner.x, inner.y + cache.titleH + titleGap, inner.width, cache.bodyH);
+            // Dibujamos el título SIN wrap y con clip
+            bool prevWrap = ttTitleStyle.wordWrap;
+            var prevClip = ttTitleStyle.clipping;
+            bool prevRich = ttTitleStyle.richText;
+            ttTitleStyle.wordWrap = false;
+            ttTitleStyle.clipping = TextClipping.Clip;
+            ttTitleStyle.richText = true; // mantenemos negrita del <b>
+
+            GUI.Label(titleR, cache.titleGC, ttTitleStyle);
+
+            // Medimos el ancho real del título (texto sin tags)
+            string titlePlain = StripRichTags(cache.titleGC.text);
+            var measureTitleStyle = new GUIStyle(ttTitleStyle) { richText = false };
+            float titleW = measureTitleStyle.CalcSize(new GUIContent(titlePlain)).x;
+            titleW = Mathf.Min(titleW, titleR.width);
+
+            // Calculamos el área restante para el teaser
+            const string SEP = "           ";
+            var teaserStyle = new GUIStyle(ttBodyStyle)
+            {
+                wordWrap = false,
+                clipping = TextClipping.Clip,
+                richText = false,
+                alignment = TextAnchor.MiddleLeft
+            };
+            teaserStyle.normal.textColor = cache.preferDark ? new Color(0f, 0f, 0f, 0.70f)
+                                                            : new Color(1f, 1f, 1f, 0.75f);
+
+            float sepW = teaserStyle.CalcSize(new GUIContent(SEP)).x;
+            float remain = titleR.width - titleW - sepW;
+
+            if (remain > 40f) // si no hay espacio razonable, no pintamos teaser
+            {
+                // Construimos teaser desde el RAW (plano) y lo ellipsizamos al ancho disponible
+                string teaserPlain = BuildTeaserFromRaw(raw);
+                string teaserFit = EllipsizeToWidth(teaserStyle, teaserPlain, remain);
+
+                // Pinta separador + teaser
+                var sepR = new Rect(titleR.x + titleW, titleR.y, sepW, titleR.height);
+                var tzR = new Rect(sepR.xMax, titleR.y, remain, titleR.height);
+
+                GUI.Label(sepR, SEP, teaserStyle);
+                GUI.Label(tzR, teaserFit, teaserStyle);
+            }
+
+            // Restaurar estilo
+            ttTitleStyle.wordWrap = prevWrap;
+            ttTitleStyle.clipping = prevClip;
+            ttTitleStyle.richText = prevRich;
+        }
+        else
+        {
+            // Modo no colapsado: igual que antes
+            GUI.Label(titleR, cache.titleGC, ttTitleStyle);
+
+            Rect bodyR = new Rect(inner.x, inner.y + titleH + titleGap, inner.width, cache.bodyH);
             RenderBodyWithInlineImages(cache, bodyR);
             HandleLinksClicks(cache);
-            HandleChecklistClicks(bodyR, cache, pNotes);
+            HandleChecklistClicks_PerNote(bodyR, cache, pBody, key);
             HandleImageClicks(cache);
         }
 
         GUI.EndGroup();
     }
+    static string BuildTeaserFromRaw(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+
+        // 1) Quitar imágenes: [img](...)
+        string s = Regex.Replace(raw, @"\[img\]\([^)]*\)", "", RegexOptions.IgnoreCase);
+
+        // 2) Reescritura inteligente de [token](inner)
+        //    - Etiquetas conocidas -> inner (o (inner) para tag)
+        //    - Enlace normal -> texto visible (el contenido de [ ... ])
+        s = Regex.Replace(
+            s,
+            @"\[(?<tok>[^\]]+)\]\((?<inner>[^)]*)\)",
+            new MatchEvaluator(m =>
+            {
+                string tok = m.Groups["tok"].Value;
+                string inner = m.Groups["inner"].Value;
+
+                // token puede venir como "keyword" o "keyword=param"
+                string keyword = tok;
+                int eq = keyword.IndexOf('=');
+                if (eq >= 0) keyword = keyword.Substring(0, eq).Trim();
+                keyword = keyword.Trim().ToLowerInvariant();
+
+                switch (keyword)
+                {
+                    case "bold":
+                    case "italics":
+                    case "color":
+                    case "size":
+                        // formato: mostrar solo el contenido
+                        return inner;
+                    case "tag":
+                        return "@" + inner;
+                    case "check":
+                    case "checkx":
+                        return (keyword == "check") ? "☐ " + inner : "☑ " + inner;
+
+                    default:
+                        // enlace normal: mostrar el texto visible (lo que había en [ ... ])
+                        return tok;
+                }
+            }),
+            RegexOptions.IgnoreCase
+        );
+
+        // 3) Quitar separadores tipo [hr] o líneas con ---
+        s = Regex.Replace(s, @"(\[hr\])|(^\s*-{3,}\s*$)", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+        // 4) Normalizar espacios/nuevas líneas a una sola línea
+        s = s.Replace("\r", " ").Replace("\n", " ");
+        s = Regex.Replace(s, @"\s{2,}", " ").Trim();
+
+        return s;
+    }
+
+
+    static string StripRichTags(string styled)
+    {
+        if (string.IsNullOrEmpty(styled)) return "";
+        // Quita tags de richtext <...>
+        string s = Regex.Replace(styled, @"<[^>]+>", "");
+        // Colapsa espacios
+        s = Regex.Replace(s, @"\s{2,}", " ").Trim();
+        return s;
+    }
+
+    static string EllipsizeToWidth(GUIStyle style, string text, float maxWidth)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        var gc = new GUIContent(text);
+        float w = style.CalcSize(gc).x;
+        if (w <= maxWidth) return text;
+
+        const string ell = "…";
+        int lo = 0, hi = text.Length;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) >> 1;
+            var g = new GUIContent(text.Substring(0, mid) + ell);
+            float mw = style.CalcSize(g).x;
+            if (mw <= maxWidth) lo = mid; else hi = mid - 1;
+        }
+        return (lo <= 0) ? ell : text.Substring(0, lo) + ell;
+    }
+
+
+    int NoteCacheKey(int instanceId, string propertyPath)
+        => unchecked((instanceId * 397) ^ propertyPath.GetHashCode());
+
+    void HandleChecklistClicks_PerNote(Rect bodyR, PreviewCache cache, SerializedProperty pBody, int cacheKey)
+    {
+        var e = Event.current;
+        foreach (var ck in cache.checks)
+        {
+            foreach (var r in ck.hitRects)
+            {
+                bool newVal = GUI.Toggle(r, ck.isChecked, GUIContent.none);
+                if (newVal != ck.isChecked)
+                {
+                    string cur = pBody.stringValue ?? string.Empty;
+                    string updated = LinkMarkup.ToggleChecklistAt(cur, ck.rawStateCharIndex, newVal);
+                    if (updated != cur)
+                    {
+                        Undo.RecordObject(tgt, "Toggle Checklist");
+                        pBody.stringValue = updated;
+                        serializedObject.ApplyModifiedProperties();
+                        s_preview.Remove(cacheKey);
+                    }
+                    e.Use(); return;
+                }
+            }
+        }
+    }
+
 
     void RenderBodyWithInlineImages(PreviewCache cache, Rect bodyR)
     {
@@ -572,7 +742,6 @@ public class GameObjectNotesEditor : Editor
 
         foreach (var im in orderedImgs)
         {
-            // 1) Texto anterior hasta INICIO de línea del marcador
             int segStartStr = curStr;
             int lineStartStr = FindLineStartStr(im.strMarkerIndex);
 
@@ -587,7 +756,6 @@ public class GameObjectNotesEditor : Editor
                 int segVisStart = cache.indexMap.str2vis[segStartStr];
                 int segVisEnd = cache.indexMap.str2vis[lineStartStr];
 
-                // Links
                 {
                     var tmp = new List<LinkMarkup.LinkSpan>();
                     foreach (var li in cache.links)
@@ -606,7 +774,6 @@ public class GameObjectNotesEditor : Editor
                         }
                     }
                 }
-                // Checks
                 {
                     var tmp = new List<LinkMarkup.ChecklistSpan>();
                     foreach (var ck in cache.checks)
@@ -628,7 +795,6 @@ public class GameObjectNotesEditor : Editor
                 curY += segH;
             }
 
-            // 2) Imagen o HR centrado
             if (im.src == "__HR__")
             {
                 float hrW = contentW * 0.85f;
@@ -637,14 +803,35 @@ public class GameObjectNotesEditor : Editor
                 var col = cache.preferDark ? new Color(0f, 0f, 0f, 0.35f) : new Color(1f, 1f, 1f, 0.15f);
                 Rect hr = new Rect(hrX, curY + 4f, hrW, hrH);
                 EditorGUI.DrawRect(hr, col);
-                curY += hrH + 8f; // pequeño padding vertical
+                curY += hrH + 8f;
             }
             else if (LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var _isExt) && tex != null)
             {
-                float w = Mathf.Min(contentW, 200f);
-                float h = uv.width > 0f && uv.height > 0f
-                            ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
-                            : tex.height * (w / Mathf.Max(1f, (float)tex.width));
+                // Antes 200px; ahora, si hay altura fija, usamos todo el contentW.
+                float maxW = (im.height > 0f) ? contentW : Mathf.Min(contentW, 200f);
+
+                float aspect = (uv.width > 0f && uv.height > 0f)
+                    ? (uv.height / Mathf.Max(0.0001f, uv.width))
+                    : ((float)tex.height / Mathf.Max(1f, (float)tex.width));
+
+                float w, h;
+                if (im.height > 0f)
+                {
+                    h = im.height;
+                    w = h / Mathf.Max(0.0001f, aspect);
+
+                    if (w > maxW)
+                    {
+                        float s = maxW / w;
+                        w = maxW;
+                        h = Mathf.Max(1f, h * s);
+                    }
+                }
+                else
+                {
+                    w = maxW;
+                    h = maxW * aspect;
+                }
 
                 float x = bodyR.x + ((contentW - w) * 0.5f);
                 var dest = new Rect(x, curY, w, h);
@@ -662,12 +849,10 @@ public class GameObjectNotesEditor : Editor
                 curY += lineH;
             }
 
-            // 3) Saltar la línea del marcador
             int lineEndStr = FindLineEndStr(lineStartStr);
             curStr = lineEndStr;
         }
 
-        // 4) Resto del texto
         if (curStr < full.Length)
         {
             string segText = full.Substring(curStr);
@@ -678,7 +863,6 @@ public class GameObjectNotesEditor : Editor
             int segVisStart = cache.indexMap.str2vis[curStr];
             int segVisEnd = cache.indexMap.visibleLen;
 
-            // Links
             {
                 var tmp = new List<LinkMarkup.LinkSpan>();
                 foreach (var li in cache.links)
@@ -697,7 +881,6 @@ public class GameObjectNotesEditor : Editor
                     }
                 }
             }
-            // Checks
             {
                 var tmp = new List<LinkMarkup.ChecklistSpan>();
                 foreach (var ck in cache.checks)
@@ -717,9 +900,6 @@ public class GameObjectNotesEditor : Editor
             }
         }
     }
-
-
-
 
 
     void DrawTooltipBackground(Rect r, Color bg, Color accent, bool accentLeft = false)
@@ -754,16 +934,16 @@ public class GameObjectNotesEditor : Editor
         extraHeight = 0f;
 
         float lineH = GetStyleLineHeight(bodyStyle);
+        const float IMG_VPAD = 15f;
 
         cache.images.Sort((a, b) => a.strMarkerIndex.CompareTo(b.strMarkerIndex));
 
         float accumulated = 0f;
         foreach (var im in cache.images)
         {
-            // HR: 1px (con padding) – no entra en imgLayout ni es clickable
             if (im.src == "__HR__")
             {
-                float h = 1f + 8f; // línea + padding vertical usado en el render
+                float h = 1f + 8f;
                 float extra = h - lineH;
                 accumulated += extra;
                 continue;
@@ -772,18 +952,39 @@ public class GameObjectNotesEditor : Editor
             if (!LinkMarkup.TryResolveTextureOrSprite(im.src, out var tex, out var uv, out var isExternal) || tex == null)
                 continue;
 
-            float w = Mathf.Min(innerW, 200f);
-            float h2 = uv.width > 0f && uv.height > 0f
-                        ? w * (uv.height / Mathf.Max(0.0001f, uv.width))
-                        : tex.height * (w / Mathf.Max(1f, (float)tex.width));
+            // Antes: Mathf.Min(innerW, 200f). Ahora: si hay altura fija, usar innerW completo.
+            float maxW = (im.height > 0f) ? innerW : Mathf.Min(innerW, 200f);
 
-            float extra2 = h2 - lineH;
+            float aspect = (uv.width > 0f && uv.height > 0f)
+                ? (uv.height / Mathf.Max(0.0001f, uv.width))
+                : ((float)tex.height / Mathf.Max(1f, (float)tex.width));
+
+            float w, h2;
+            if (im.height > 0f)
+            {
+                h2 = im.height;
+                w = h2 / Mathf.Max(0.0001f, aspect);
+
+                if (w > maxW)
+                {
+                    float s = maxW / w;
+                    w = maxW;
+                    h2 = Mathf.Max(1f, h2 * s);
+                }
+            }
+            else
+            {
+                w = maxW;
+                h2 = maxW * aspect;
+            }
+
+            float extra2 = (h2 + IMG_VPAD) - lineH;
+
             cache.imgLayout.Add((im, tex, uv, accumulated, w, h2, default));
             accumulated += extra2;
         }
         extraHeight = accumulated;
     }
-
 
 
     float GetStyleLineHeight(GUIStyle style)

@@ -82,11 +82,11 @@ public static class LinkMarkup
         RegexOptions.Compiled);
 
     public static string BuildStyled(
-    string raw,
-    List<LinkSpan> linksOut,
-    List<ChecklistSpan> checksOut,
-    List<ImageSpan> imagesOut,
-    out VisibleIndexMap map)
+        string raw,
+        List<LinkSpan> linksOut,
+        List<ChecklistSpan> checksOut,
+        List<ImageSpan> imagesOut,
+        out VisibleIndexMap map)
     {
         linksOut?.Clear();
         checksOut?.Clear();
@@ -123,8 +123,9 @@ public static class LinkMarkup
             string keyword, param;
             ParseKeywordAndParam(tokenFull, out keyword, out param);
 
-
-            int lp = (rb + 1 < raw.Length && raw[rb + 1] == '(') ? rb + 1 : -1;
+            int lpScan = rb + 1;
+            while (lpScan < raw.Length && char.IsWhiteSpace(raw[lpScan])) lpScan++;
+            int lp = (lpScan < raw.Length && raw[lpScan] == '(') ? lpScan : -1;
             if (lp < 0)
             {
                 AppendTextWithLinksOnly(raw.Substring(b, rb - b + 1), sb, links, null);
@@ -147,14 +148,14 @@ public static class LinkMarkup
                 if (k == "bold")
                 {
                     sb.Append("<b>");
-                    AppendTextWithLinksOnly(inner, sb, links, null);
+                    AppendTextWithMarkup(inner, sb, links, null);
                     sb.Append("</b>");
                     i = rp + 1; continue;
                 }
                 if (k == "italics")
                 {
                     sb.Append("<i>");
-                    AppendTextWithLinksOnly(inner, sb, links, null);
+                    AppendTextWithMarkup(inner, sb, links, null);
                     sb.Append("</i>");
                     i = rp + 1; continue;
                 }
@@ -165,7 +166,7 @@ public static class LinkMarkup
                     else
                     {
                         sb.Append("<color=").Append(col).Append(">");
-                        AppendTextWithLinksOnly(inner, sb, links, null);
+                        AppendTextWithMarkup(inner, sb, links, null);
                         sb.Append("</color>");
                     }
                     i = rp + 1; continue;
@@ -176,7 +177,7 @@ public static class LinkMarkup
                     if (!int.TryParse(param, out sizePx)) sizePx = 12;
                     sizePx = Mathf.Clamp(sizePx, 6, 64);
                     sb.Append("<size=").Append(sizePx).Append(">");
-                    AppendTextWithLinksOnly(inner, sb, links, null);
+                    AppendTextWithMarkup(inner, sb, links, null);
                     sb.Append("</size>");
                     i = rp + 1; continue;
                 }
@@ -195,7 +196,7 @@ public static class LinkMarkup
 
                     sb.Append(box);
                     if (isChecked) sb.Append("<color=#444>");
-                    AppendTextWithLinksOnly(inner, sb, links, isChecked ? "#888888" : null);
+                    AppendTextWithMarkup(inner, sb, links, isChecked ? "#888888" : null);
                     if (isChecked) sb.Append("</color>");
 
                     checks.Add(new ChecklistSpan
@@ -210,22 +211,37 @@ public static class LinkMarkup
                 if (k == "img")
                 {
                     string id = inner.Trim();
-                    images.Add(new ImageSpan
+
+                    // NUEVO: altura opcional en píxeles con [img=ALTURA](id)
+                    int requestedHeight = 0;
+                    if (!string.IsNullOrEmpty(param))
+                    {
+                        int.TryParse(param.Trim(), out requestedHeight);
+                        requestedHeight = Mathf.Clamp(requestedHeight, 0, 4096); // 0 = auto
+                    }
+
+                    var span = new ImageSpan
                     {
                         src = id,
                         isExternal = IsExternal(id),
-                        strMarkerIndex = sb.Length
-                    });
-                    // Para imágenes seguimos el marcador de línea mínima + salto
+                        strMarkerIndex = sb.Length,
+                        // Usamos 'height' como “altura solicitada” si > 0; el layout la respetará.
+                        height = requestedHeight > 0 ? requestedHeight : 0f
+                    };
+
+                    images.Add(span);
+
+                    // Marcador de línea para imagen/HR
                     sb.Append('\u200B');
                     sb.Append('\n');
+
                     i = rp + 1; continue;
                 }
                 if (k == "tag")
                 {
                     const string tagColor = "#FFD54A";
                     sb.Append("<b><color=").Append(tagColor).Append(">@");
-                    AppendTextWithLinksOnly(inner, sb, links, tagColor);
+                    AppendTextWithMarkup(inner, sb, links, tagColor);
                     sb.Append("</color></b>");
                     i = rp + 1; continue;
                 }
@@ -289,8 +305,6 @@ public static class LinkMarkup
 
         return styled;
     }
-
-
 
 
 
@@ -489,14 +503,38 @@ public static class LinkMarkup
         {
             if (!img.resolved || img.texture == null) continue;
 
-            float maxW = Mathf.Min(containerWidth, maxImageWidth);
-            float aspectRatio = img.texCoords.height > 0f ? (img.texCoords.height / img.texCoords.width) :
-                                ((float)img.texture.height / img.texture.width);
+            // Si el usuario fija altura [img=XXX], permitimos usar todo el ancho disponible del contenedor.
+            // Si no, mantenemos el ancho máximo "auto" (ej. 200px) que nos pasen por maxImageWidth.
+            float maxW = (img.height > 0f) ? containerWidth : Mathf.Min(containerWidth, maxImageWidth);
 
-            img.width = maxW;
-            img.height = maxW * aspectRatio;
+            float aspect = (img.texCoords.width > 0f && img.texCoords.height > 0f)
+                ? (img.texCoords.height / Mathf.Max(0.0001f, img.texCoords.width))
+                : ((float)img.texture.height / Mathf.Max(1f, (float)img.texture.width));
+
+            if (img.height > 0f)
+            {
+                float h = img.height;
+                float w = h / Mathf.Max(0.0001f, aspect);
+
+                if (w > maxW)
+                {
+                    float s = maxW / w;
+                    w = maxW;
+                    h = Mathf.Max(1f, h * s);
+                }
+
+                img.width = w;
+                img.height = h;
+            }
+            else
+            {
+                img.width = maxW;
+                img.height = maxW * aspect;
+            }
         }
     }
+
+
 
     private static void CalculateLinkRectsInSegment(Rect segmentBounds, GUIStyle style, GUIContent segmentContent,
                                                    int relStart, int relEnd, float lineHeight, List<Rect> hitRects)
@@ -745,6 +783,99 @@ public static class LinkMarkup
         }
         if (last < rawChunk.Length) sb.Append(rawChunk, last, rawChunk.Length - last);
     }
+
+    // Parseador inline con soporte de anidación para: bold, italics, color, size, tag + enlaces.
+// No procesa img/check aquí a propósito (son de bloque). Si aparecen, se tratan como literal/enlace.
+static void AppendTextWithMarkup(string rawChunk, StringBuilder sb, List<LinkSpan> links, string linkColorOverride)
+{
+    if (string.IsNullOrEmpty(rawChunk)) return;
+
+    int i = 0, N = rawChunk.Length;
+    while (i < N)
+    {
+        int b = rawChunk.IndexOf('[', i);
+        if (b < 0) { AppendTextWithLinksOnly(rawChunk.Substring(i), sb, links, linkColorOverride); break; }
+
+        if (b > i) AppendTextWithLinksOnly(rawChunk.Substring(i, b - i), sb, links, linkColorOverride);
+
+        int rb = rawChunk.IndexOf(']', b + 1);
+        if (rb < 0) { AppendTextWithLinksOnly(rawChunk.Substring(b), sb, links, linkColorOverride); break; }
+
+        string tokenFull = rawChunk.Substring(b + 1, rb - (b + 1)).Trim();
+        string keyword, param;
+        ParseKeywordAndParam(tokenFull, out keyword, out param);
+
+        int lpScan = rb + 1;
+        while (lpScan < N && char.IsWhiteSpace(rawChunk[lpScan])) lpScan++;
+        int lp = (lpScan < N && rawChunk[lpScan] == '(') ? lpScan : -1;
+        if (lp < 0) { AppendTextWithLinksOnly(rawChunk.Substring(b, rb - b + 1), sb, links, linkColorOverride); i = rb + 1; continue; }
+
+        int rp = FindClosingParen(rawChunk, lp);
+        if (rp < 0) { AppendTextWithLinksOnly(rawChunk.Substring(b), sb, links, linkColorOverride); break; }
+
+        string inner = rawChunk.Substring(lp + 1, rp - (lp + 1));
+
+        if (IsKeyword(keyword))
+        {
+            string k = keyword.ToLowerInvariant();
+
+            if (k == "bold")
+            {
+                sb.Append("<b>");
+                AppendTextWithMarkup(inner, sb, links, linkColorOverride);
+                sb.Append("</b>");
+                i = rp + 1; continue;
+            }
+            if (k == "italics")
+            {
+                sb.Append("<i>");
+                AppendTextWithMarkup(inner, sb, links, linkColorOverride);
+                sb.Append("</i>");
+                i = rp + 1; continue;
+            }
+            if (k == "color")
+            {
+                string col = NormalizeColorToken(param);
+                if (string.IsNullOrEmpty(col))
+                {
+                    AppendTextWithMarkup(inner, sb, links, linkColorOverride);
+                }
+                else
+                {
+                    sb.Append("<color=").Append(col).Append(">");
+                    AppendTextWithMarkup(inner, sb, links, linkColorOverride);
+                    sb.Append("</color>");
+                }
+                i = rp + 1; continue;
+            }
+            if (k == "size")
+            {
+                int sizePx; if (!int.TryParse(param, out sizePx)) sizePx = 12;
+                sizePx = Mathf.Clamp(sizePx, 6, 64);
+                sb.Append("<size=").Append(sizePx).Append(">");
+                AppendTextWithMarkup(inner, sb, links, linkColorOverride);
+                sb.Append("</size>");
+                i = rp + 1; continue;
+            }
+            if (k == "tag")
+            {
+                const string tagColor = "#FFD54A";
+                sb.Append("<b><color=").Append(tagColor).Append(">@");
+                // Dentro de tag, los enlaces heredan el color del tag
+                AppendTextWithMarkup(inner, sb, links, tagColor);
+                sb.Append("</color></b>");
+                i = rp + 1; continue;
+            }
+
+            // Otros keywords (img/check/...) se consideran de bloque -> tratarlos como literal/enlace
+        }
+
+        // No es keyword conocida: deja que la regex de enlaces lo gestione o quede literal si no matchea
+        AppendTextWithLinksOnly(rawChunk.Substring(b, rp - b + 1), sb, links, linkColorOverride);
+        i = rp + 1;
+    }
+}
+
 
     // ====== Layout de zonas clicables (MÉTODO LEGACY MANTENIDO PARA COMPATIBILIDAD) ======
     public static void LayoutLinkHitRects(Rect bodyR, GUIStyle style, GUIContent content, VisibleIndexMap map, List<LinkSpan> links)

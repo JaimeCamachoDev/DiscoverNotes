@@ -28,37 +28,53 @@ public static class NotesHierarchyHover
 
         if (!fullRowRect.Contains(e.mousePosition))
         {
-            // Si no hay hover, cierra las no pineadas
-            //CloseAll(unpinnedOnly: true);
+            // No cerramos aquí para respetar chinchetas (CloseAll lo hace en otros hooks)
             return;
         }
 
         var go = EditorUtility.InstanceIDToObject(instanceID) as GameObject;
         if (go == null) return;
 
-        var notesAll = go.GetComponents<GameObjectNotes>();
-        if (notesAll == null || notesAll.Length == 0) { return; }
+        var comps = go.GetComponents<GameObjectNotes>();
+        if (comps == null || comps.Length == 0) return;
 
-        // Ancla: área del nombre con indent correcto
+        // Reúne todas las notas vivas (no "borradas" = Fixed + vacío)
+        var noteRefs = new List<(GameObjectNotes owner, GameObjectNotes.NoteData note, int noteIndex)>();
+        for (int c = 0; c < comps.Length; c++)
+        {
+            var comp = comps[c];
+            var list = comp.NotesList;
+            if (list == null) continue;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var n = list[i];
+                if (n == null) continue;
+                if (GameObjectNotes.IsDeleted(n)) continue; // no mostrar "borradas"
+                                                            // Por petición posterior: tooltips SIEMPRE al hover ? ignoramos showInHierarchy
+                noteRefs.Add((comp, n, i));
+            }
+        }
+        if (noteRefs.Count == 0) { return; }
+
+        // Ancla = área del nombre (corrigiendo indent)
         var anchorLocalRect = selectionRect;
         Vector2 topLeft = GUIUtility.GUIToScreenPoint(anchorLocalRect.position);
         var baseAnchor = new Rect(topLeft.x, topLeft.y, anchorLocalRect.width, anchorLocalRect.height);
 
-        // Asegurar suficientes ventanas
-        EnsureWindowPool(notesAll.Length);
+        EnsureWindowPool(noteRefs.Count);
 
-        // Mostrar una por nota, apiladas (offset vertical por índice)
+        // Muestra una ventana por nota (apiladas)
         const float STACK_GAP = 20f;
-        for (int i = 0; i < notesAll.Length; i++)
+        for (int i = 0; i < noteRefs.Count; i++)
         {
             var w = s_Windows[i];
             var offsetAnchor = new Rect(baseAnchor.x, baseAnchor.y + i * (anchorLocalRect.height + STACK_GAP), baseAnchor.width, baseAnchor.height);
             if (w == null) { w = NotesTooltipWindow.Create(); s_Windows[i] = w; }
-            w.ShowFor(notesAll[i], offsetAnchor);
+            w.ShowFor(noteRefs[i].owner, noteRefs[i].note, noteRefs[i].noteIndex, offsetAnchor);
         }
 
-        // Cerrar sobrantes sin pin
-        for (int i = notesAll.Length; i < s_Windows.Count; i++)
+        // Cierra sobrantes (no pineadas)
+        for (int i = noteRefs.Count; i < s_Windows.Count; i++)
         {
             var w = s_Windows[i];
             if (w != null && !w.IsPinned) { try { w.Close(); } catch { } s_Windows[i] = null; }
