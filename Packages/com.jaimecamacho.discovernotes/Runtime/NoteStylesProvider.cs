@@ -39,6 +39,18 @@ public static class NoteStylesProvider
         s_lastCategoryForFind = null;
     }
 
+    internal static void NotifyStylesModified(NoteStyles styles)
+    {
+        if (styles == null)
+        {
+            ClearCaches();
+            return;
+        }
+
+        s_cachedStyles = styles;
+        BuildSimpleCaches();
+    }
+
     public static NoteStyles GetOrCreateStyles()
     {
         if (s_cachedStyles != null)

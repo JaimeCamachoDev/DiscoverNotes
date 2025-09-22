@@ -62,4 +62,11 @@ public class NoteStyles : ScriptableObject
         "Workflow / Pipeline",
         "Other"
     };
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        NoteStylesProvider.NotifyStylesModified(this);
+    }
+#endif
 }
