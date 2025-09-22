@@ -64,7 +64,8 @@ public class GameObjectNotes : MonoBehaviour
 
         public bool HasDiscoverContent()
         {
-            return !string.IsNullOrEmpty(discoverSummary)
+            return discoverImage != null
+                || !string.IsNullOrEmpty(discoverSummary)
                 || (discoverSections != null && discoverSections.Count > 0);
         }
     }

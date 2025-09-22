@@ -199,7 +199,12 @@ public class NotesTooltipWindow : EditorWindow
 
         string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
         string date = string.IsNullOrEmpty(_noteData?.dateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : _noteData.dateCreated;
+        var discipline = _noteData != null
+            ? DiscoverCategoryUtility.GetDisplayName(_noteData.discoverCategory)
+            : DiscoverCategoryUtility.GetDisplayName(DiscoverCategory.Other);
         string catName = string.IsNullOrEmpty(_noteData?.category) ? "Nota" : _noteData.category;
+        if (!string.IsNullOrEmpty(discipline))
+            catName = $"{catName} · {discipline}";
 
         float screenW = Screen.currentResolution.width;
         float maxTitleW = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f));
