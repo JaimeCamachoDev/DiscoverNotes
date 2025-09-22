@@ -359,7 +359,7 @@ public class GameObjectNotesEditor : Editor
         int prevIndent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
         EditorGUI.BeginChangeCheck();
-        int newIdx = EditorGUI.Popup(rect, DiscoverDisciplineContent, current, names);
+        int newIdx = EditorGUI.Popup(rect, DiscoverDisciplineContent.text, current, names);
         if (EditorGUI.EndChangeCheck())
             pDiscipline.enumValueIndex = newIdx;
         EditorGUI.indentLevel = prevIndent;
