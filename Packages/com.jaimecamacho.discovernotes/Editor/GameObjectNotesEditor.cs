@@ -282,6 +282,15 @@ public class GameObjectNotesEditor : Editor
             EditorGUILayout.PropertyField(pTitle, NoteTitleContent);
         }
 
+
+        // NUEVO: imagen principal debajo del título
+        var pImage = pNote.FindPropertyRelative("discoverImage");
+        if (pImage != null)
+        {
+            EditorGUILayout.PropertyField(pImage, DiscoverImageContent);
+        }
+
+
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");
         var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
@@ -373,7 +382,7 @@ public class GameObjectNotesEditor : Editor
     void DrawEditableNotes_PlainAutoHeight_PerNote(SerializedProperty pNote, int noteIndex)
     {
         var pBody = pNote.FindPropertyRelative("notes");
-        EditorGUILayout.LabelField("Contenido (texto plano; se interpreta al mostrar)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Descripcion (texto plano; se interpreta al mostrar)", EditorStyles.boldLabel);
 
         string text = pBody.stringValue ?? string.Empty;
         float viewW = Mathf.Max(100f, EditorGUIUtility.currentViewWidth - 36f);
@@ -479,14 +488,14 @@ public class GameObjectNotesEditor : Editor
     void DrawDiscoverContent_Edit(SerializedProperty pNote)
     {
         GUILayout.Space(8);
-        string discoverTitle = pNote.FindPropertyRelative("discoverName")?.stringValue;
-        if (string.IsNullOrWhiteSpace(discoverTitle))
-            discoverTitle = "Documentacin visual";
-        EditorGUILayout.LabelField(discoverTitle, EditorStyles.boldLabel);
+        // Quitamos el título duplicado y la imagen (la imagen ya va debajo del título).
         using (new EditorGUI.IndentLevelScope())
         {
-            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverImage"), DiscoverImageContent);
-            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSections"), DiscoverSectionsContent, true);
+            EditorGUILayout.PropertyField(
+                pNote.FindPropertyRelative("discoverSections"),
+                DiscoverSectionsContent,
+                true
+            );
         }
     }
 
