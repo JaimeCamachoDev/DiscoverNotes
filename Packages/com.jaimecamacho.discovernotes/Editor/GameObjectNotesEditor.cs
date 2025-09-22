@@ -90,7 +90,7 @@ public class GameObjectNotesEditor : Editor
 
         if (pList.arraySize == 0)
         {
-            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → "Añadir nota".", MessageType.Info);
+            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → 'Añadir nota'.", MessageType.Info);
         }
 
         // Dibuja cada nota como una tarjeta independiente
