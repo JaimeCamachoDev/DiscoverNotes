@@ -334,15 +334,15 @@ public class GameObjectNotesEditor : Editor
     }
 
 
-    void DrawDiscoverDisciplinePopup(Rect rect, SerializedProperty pDiscipline)
+    void DrawDiscoverDisciplinePopup(Rect r, SerializedProperty pDiscipline)
     {
         if (pDiscipline == null)
         {
-            EditorGUI.LabelField(rect, DiscoverDisciplineContent, new GUIContent(""));
+            EditorGUI.LabelField(r, DiscoverDisciplineContent, new GUIContent(""));
             return;
         }
 
-        EditorGUI.BeginProperty(rect, DiscoverDisciplineContent, pDiscipline);
+        EditorGUI.BeginProperty(r, DiscoverDisciplineContent, pDiscipline);
 
         string[] names = NoteStylesProvider.GetDisciplineNamesCopy();
         if (names.Length == 0)
@@ -353,20 +353,21 @@ public class GameObjectNotesEditor : Editor
         }
 
         int current = Mathf.Clamp(pDiscipline.enumValueIndex, 0, names.Length - 1);
-        if (current != pDiscipline.enumValueIndex)
-            pDiscipline.enumValueIndex = current;
 
-        int prevIndent = EditorGUI.indentLevel;
-        EditorGUI.indentLevel = 0;
+        const float iconW = 18f;
+        Rect iconRect = new Rect(r.x, r.y + 1, iconW, EditorGUIUtility.singleLineHeight);
+        Rect popupRect = new Rect(iconRect.xMax + 4, r.y, r.width - iconW - 4, EditorGUIUtility.singleLineHeight);
+
+        // (opcional: icono genérico de disciplina)
+        GUI.Label(iconRect, EditorGUIUtility.IconContent("d_FilterByType"));
+
         EditorGUI.BeginChangeCheck();
-        int newIdx = EditorGUI.Popup(rect, DiscoverDisciplineContent.text, current, names);
+        int newIdx = EditorGUI.Popup(popupRect, current, names);
         if (EditorGUI.EndChangeCheck())
             pDiscipline.enumValueIndex = newIdx;
-        EditorGUI.indentLevel = prevIndent;
 
         EditorGUI.EndProperty();
     }
-
 
     // ---------- Edición: TextArea PLANA (min/max líneas + ScrollView) ----------
     void DrawEditableNotes_PlainAutoHeight_PerNote(SerializedProperty pNote, int noteIndex)

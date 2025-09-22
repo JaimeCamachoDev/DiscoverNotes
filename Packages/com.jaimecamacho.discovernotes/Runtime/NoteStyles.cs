@@ -53,14 +53,7 @@ public class NoteStyles : ScriptableObject
     [Header("Discover disciplines (dropdown)")]
     public List<string> discoverDisciplines = new List<string>
     {
-        "FX",
-        "Audio",
-        "Gameplay",
-        "UI / UX",
-        "Environment",
-        "Systems / Code",
-        "Workflow / Pipeline",
-        "Other"
+        "FX","Audio","Gameplay","UI / UX", "Environment", "Systems / Code", "Workflow / Pipeline", "Other"
     };
 
 #if UNITY_EDITOR
