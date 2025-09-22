@@ -8,13 +8,13 @@ using UnityEngine;
 /// </summary>
 public enum DiscoverCategory
 {
-    [InspectorName("FX")] VisualEffects,
+    [InspectorName("FX")] FX,
     [InspectorName("Audio")] Audio,
     [InspectorName("Gameplay")] Gameplay,
-    [InspectorName("UI / UX")] UI,
+    [InspectorName("UI / UX")] UIUX,
     [InspectorName("Environment")] Environment,
-    [InspectorName("Systems / Code")] Systems,
-    [InspectorName("Workflow / Pipeline")] Workflow,
+    [InspectorName("Systems / Code")] SystemsCode,
+    [InspectorName("Workflow / Pipeline")] WorkflowPipeline,
     [InspectorName("Other")] Other
 }
 
@@ -48,6 +48,26 @@ public static class DiscoverCategoryUtility
 
     public static string GetDisplayName(DiscoverCategory category)
     {
+        switch (category)
+        {
+            case DiscoverCategory.FX:
+                return "FX";
+            case DiscoverCategory.Audio:
+                return "Audio";
+            case DiscoverCategory.Gameplay:
+                return "Gameplay";
+            case DiscoverCategory.UIUX:
+                return "UI / UX";
+            case DiscoverCategory.Environment:
+                return "Environment";
+            case DiscoverCategory.SystemsCode:
+                return "Systems / Code";
+            case DiscoverCategory.WorkflowPipeline:
+                return "Workflow / Pipeline";
+            case DiscoverCategory.Other:
+                return "Other";
+        }
+
         var members = typeof(DiscoverCategory).GetMember(category.ToString());
         if (members != null && members.Length > 0)
         {
