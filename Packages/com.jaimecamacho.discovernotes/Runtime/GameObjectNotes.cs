@@ -17,20 +17,20 @@ public class GameObjectNotes : MonoBehaviour
     [TextArea(3, 15)]
     [SerializeField] private string notes = "";
 
-    [Header("Visualización")]
+    [Header("VisualizaciÃ³n")]
     [SerializeField] private DisplayMode displayMode = DisplayMode.Edit;
 
-    [Header("Mostrar tooltip en Jerarquía")]
+    [Header("Mostrar tooltip en JerarquÃ­a")]
     [SerializeField] private bool showInHierarchy = true;
 
-    // Propiedades públicas
+    // Propiedades pÃºblicas
     public string Author => author;
     public string DateCreated => dateCreated;
     public string Category => category;
     public string NotesText => notes;
     public DisplayMode Mode => displayMode;
 
-    // El tooltip y la vista fija aplican rich text sólo en modo Fixed
+    // El tooltip y la vista fija aplican rich text sÃ³lo en modo Fixed
     public bool RenderRichText => displayMode == DisplayMode.Fixed;
 
     public bool ShowInHierarchy => showInHierarchy;
@@ -42,22 +42,44 @@ public class GameObjectNotes : MonoBehaviour
         public string dateCreated = "";         // dd/MM/yyyy
         public string category = "Info";
 
+        [Header("Discover â€“ InformaciÃ³n General")]
+        public string discoverName = "Discover";
+        public DiscoverCategory discoverCategory = DiscoverCategory.Other;
+        public Texture2D discoverImage;
+
+        [TextArea(2, 10)]
+        public string discoverSummary = "";
+
+        [Header("Discover â€“ Contenido estructurado")]
+        public List<DiscoverSection> discoverSections = new List<DiscoverSection>();
+
+        [Header("Notas detalladas (texto plano)")]
         [TextArea(3, 15)]
         public string notes = "";
 
         public DisplayMode displayMode = DisplayMode.Edit;
 
-        // Se podrá ocultar/editar independiente del resto (campo por nota)
+        // Se podrÃ¡ ocultar/editar independiente del resto (campo por nota)
         public bool showInHierarchy = true;
+
+        public bool HasDiscoverContent()
+        {
+            return !string.IsNullOrEmpty(discoverSummary)
+                || (discoverSections != null && discoverSections.Count > 0);
+        }
     }
 
     // Nueva lista de notas
     [SerializeField] private List<NoteData> notesList = new List<NoteData>();
     public IReadOnlyList<NoteData> NotesList => notesList;
 
-    // Regla de borrado: Fixed + cuerpo vacío
+    // Regla de borrado: Fixed + cuerpo vacÃ­o
     public static bool IsDeleted(NoteData n)
-        => n != null && n.displayMode == DisplayMode.Fixed && string.IsNullOrEmpty(n.notes);
+        => n != null
+           && n.displayMode == DisplayMode.Fixed
+           && string.IsNullOrEmpty(n.notes)
+           && string.IsNullOrEmpty(n.discoverSummary)
+           && (n.discoverSections == null || n.discoverSections.Count == 0);
 
 
 #if UNITY_EDITOR
@@ -68,7 +90,7 @@ public class GameObjectNotes : MonoBehaviour
 
     void CoerceDefaults()
     {
-        // --- MIGRACIÓN DESDE CAMPOS LEGACY (si existían y la lista está vacía) ---
+        // --- MIGRACIÃ“N DESDE CAMPOS LEGACY (si existÃ­an y la lista estÃ¡ vacÃ­a) ---
         if ((notesList == null || notesList.Count == 0) &&
             (!string.IsNullOrEmpty(notes) || !string.IsNullOrEmpty(author) || !string.IsNullOrEmpty(category)))
         {
@@ -87,7 +109,7 @@ public class GameObjectNotes : MonoBehaviour
 
         if (notesList == null) notesList = new List<NoteData>();
 
-        // --- NORMALIZACIÓN POR NOTA ---
+        // --- NORMALIZACIÃ“N POR NOTA ---
         for (int i = 0; i < notesList.Count; i++)
         {
             var n = notesList[i];
@@ -95,6 +117,19 @@ public class GameObjectNotes : MonoBehaviour
 
             if (string.IsNullOrEmpty(n.dateCreated))
                 n.dateCreated = DateTime.Now.ToString("dd/MM/yyyy");
+
+            if (string.IsNullOrEmpty(n.discoverName))
+                n.discoverName = gameObject.name;
+
+            if (n.discoverSections == null)
+                n.discoverSections = new List<DiscoverSection>();
+
+            for (int s = 0; s < n.discoverSections.Count; s++)
+            {
+                var section = n.discoverSections[s];
+                if (section == null) { n.discoverSections[s] = section = new DiscoverSection(); }
+                if (section.actions == null) section.actions = new List<DiscoverAction>();
+            }
 
 #if UNITY_EDITOR
             var authors = NoteStylesProvider.GetAuthors();
@@ -119,7 +154,7 @@ public class GameObjectNotes : MonoBehaviour
     {
         if (notesList == null) return false;
         int before = notesList.Count;
-        notesList.RemoveAll(n => IsDeleted(n)); // Fixed + cuerpo vacío
+        notesList.RemoveAll(n => IsDeleted(n)); // Fixed + cuerpo vacÃ­o
         return notesList.Count != before;
     }
 
@@ -127,11 +162,11 @@ public class GameObjectNotes : MonoBehaviour
 #if UNITY_EDITOR
     //using UnityEditor;
 
-    [MenuItem("CONTEXT/GameObjectNotes/Añadir nota")]
+    [MenuItem("CONTEXT/GameObjectNotes/AÃ±adir nota")]
     private static void Ctx_AddNote(MenuCommand cmd)
     {
         var comp = (GameObjectNotes)cmd.context;
-        Undo.RecordObject(comp, "Añadir nota");
+        Undo.RecordObject(comp, "AÃ±adir nota");
 
         if (comp.notesList == null) comp.notesList = new List<NoteData>();
         var n = new NoteData
@@ -141,13 +176,91 @@ public class GameObjectNotes : MonoBehaviour
             dateCreated = DateTime.Now.ToString("dd/MM/yyyy"),
             category = (NoteStylesProvider.GetCategoryNames()?.Length ?? 0) > 0
                        ? NoteStylesProvider.GetCategoryNames()[0] : "Info",
-            notes = "",
+            discoverName = comp.gameObject.name,
+            discoverCategory = DiscoverCategory.Other,
+            discoverSummary = string.Empty,
+            discoverSections = new List<DiscoverSection>(),
+            notes = string.Empty,
             displayMode = DisplayMode.Edit,
             showInHierarchy = true
         };
         comp.notesList.Add(n);
 
         EditorUtility.SetDirty(comp);
+    }
+
+    [ContextMenu("Importar datos de DiscoverVZ")]
+    public void ImportFromDiscoverVZ()
+    {
+#if UNITY_EDITOR
+        var legacy = GetComponent<DiscoverVZ>();
+        if (legacy == null)
+        {
+            Debug.LogWarning("No se encontrÃ³ un componente DiscoverVZ en este GameObject.");
+            return;
+        }
+
+        Undo.RegisterCompleteObjectUndo(this, "Import DiscoverVZ");
+
+        if (notesList == null)
+            notesList = new List<NoteData>();
+
+        var note = new NoteData
+        {
+            author = (NoteStylesProvider.GetAuthors()?.Length ?? 0) > 0
+                     ? NoteStylesProvider.GetAuthors()[0] : "",
+            dateCreated = DateTime.Now.ToString("dd/MM/yyyy"),
+            category = (NoteStylesProvider.GetCategoryNames()?.Length ?? 0) > 0
+                       ? NoteStylesProvider.GetCategoryNames()[0] : "Info",
+            discoverName = legacy.discoverName,
+            discoverCategory = legacy.category,
+            discoverImage = legacy.image,
+            discoverSummary = legacy.description,
+            discoverSections = new List<DiscoverSection>(),
+            notes = legacy.description,
+            displayMode = DisplayMode.Fixed,
+            showInHierarchy = true
+        };
+
+        if (legacy.sections != null)
+        {
+            for (int i = 0; i < legacy.sections.Count; i++)
+            {
+                var src = legacy.sections[i];
+                if (src == null) continue;
+
+                var dst = new DiscoverSection
+                {
+                    sectionName = src.sectionName,
+                    image = src.image,
+                    sectionContent = src.sectionContent,
+                    actions = new List<DiscoverAction>()
+                };
+
+                if (src.actions != null)
+                {
+                    for (int a = 0; a < src.actions.Count; a++)
+                    {
+                        var act = src.actions[a];
+                        if (act == null) continue;
+                        dst.actions.Add(new DiscoverAction
+                        {
+                            description = act.description,
+                            target = act.target,
+                            hint = act.hint ?? string.Empty
+                        });
+                    }
+                }
+
+                note.discoverSections.Add(dst);
+            }
+        }
+
+        notesList.Add(note);
+        EditorUtility.SetDirty(this);
+#else
+        Debug.LogWarning("Importar datos de DiscoverVZ solo estÃ¡ disponible en el Editor.");
+#endif
     }
     #endif
 }

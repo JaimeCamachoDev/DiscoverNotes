@@ -1,43 +1,41 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// DiscoverVZ: Sistema de documentación visual para la escena.
+/// DiscoverVZ (legacy): mantenido para compatibilidad. Toda la funcionalidad vive ahora
+/// dentro de <see cref="GameObjectNotes"/>.
 /// </summary>
-[AddComponentMenu("VirtualZone/DiscoverVZ")]
+[AddComponentMenu("VirtualZone/DiscoverVZ (Legacy)")]
 [DisallowMultipleComponent]
+[
+    System.Obsolete(
+        "DiscoverVZ ha sido fusionado con GameObjectNotes. Usa GameObjectNotes para " +
+        "crear y mantener la documentaciÃ³n visual.")
+]
 public class DiscoverVZ : MonoBehaviour
 {
-    public enum DiscoverCategory
-    {
-        VisualEffects, Audio, Gameplay, UI, Environment, Other
-    }
-
     public string discoverName = "Discover";
     public DiscoverCategory category = DiscoverCategory.Other;
     public Texture2D image;
     [TextArea] public string description = "Description of the component.";
-    public List<DiscoverSection> sections = new List<DiscoverSection>();
-}
+    public System.Collections.Generic.List<DiscoverSection> sections = new System.Collections.Generic.List<DiscoverSection>();
 
-/// <summary>
-/// Sección dentro de DiscoverVZ, que puede contener acciones.
-/// </summary>
-[System.Serializable]
-public class DiscoverSection
-{
-    public string sectionName = "Section Name";
-    public Texture2D image;
-    [TextArea] public string sectionContent = "Section Content";
-    public List<DiscoverAction> actions = new List<DiscoverAction>();
-}
+#if UNITY_EDITOR
+    void Reset()
+    {
+        if (GetComponent<GameObjectNotes>() == null)
+        {
+            UnityEditor.Undo.AddComponent<GameObjectNotes>(gameObject);
+        }
+    }
 
-/// <summary>
-/// Acción dentro de una sección, que permite navegar a un objeto.
-/// </summary>
-[System.Serializable]
-public class DiscoverAction
-{
-    public string description = "Action Name";
-    public GameObject target;
+    [ContextMenu("Convertir a GameObjectNotes y eliminar")]
+    public void ConvertAndRemove()
+    {
+        var notes = GetComponent<GameObjectNotes>();
+        if (notes == null) notes = gameObject.AddComponent<GameObjectNotes>();
+
+        notes.ImportFromDiscoverVZ();
+        UnityEditor.Undo.DestroyObjectImmediate(this);
+    }
+#endif
 }
