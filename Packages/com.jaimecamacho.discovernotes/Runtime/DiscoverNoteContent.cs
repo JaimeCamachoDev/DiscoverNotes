@@ -8,14 +8,57 @@ using UnityEngine;
 /// </summary>
 public enum DiscoverCategory
 {
-    VisualEffects,
-    Audio,
-    Gameplay,
-    UI,
-    Environment,
-    Systems,
-    Workflow,
-    Other
+    [InspectorName("FX")] VisualEffects,
+    [InspectorName("Audio")] Audio,
+    [InspectorName("Gameplay")] Gameplay,
+    [InspectorName("UI / UX")] UI,
+    [InspectorName("Environment")] Environment,
+    [InspectorName("Systems / Code")] Systems,
+    [InspectorName("Workflow / Pipeline")] Workflow,
+    [InspectorName("Other")] Other
+}
+
+/// <summary>
+/// Helper utilities shared by runtime and editor code to present Discover categories with
+/// user-friendly labels.
+/// </summary>
+public static class DiscoverCategoryUtility
+{
+    static readonly DiscoverCategory[] s_values =
+        (DiscoverCategory[])Enum.GetValues(typeof(DiscoverCategory));
+
+    static readonly string[] s_displayNames = BuildDisplayNames();
+
+    static string[] BuildDisplayNames()
+    {
+        var names = new string[s_values.Length];
+        for (int i = 0; i < s_values.Length; i++)
+            names[i] = GetDisplayName(s_values[i]);
+        return names;
+    }
+
+    public static IReadOnlyList<DiscoverCategory> Values => s_values;
+
+    public static string[] GetDisplayNamesCopy()
+    {
+        var copy = new string[s_displayNames.Length];
+        Array.Copy(s_displayNames, copy, copy.Length);
+        return copy;
+    }
+
+    public static string GetDisplayName(DiscoverCategory category)
+    {
+        var members = typeof(DiscoverCategory).GetMember(category.ToString());
+        if (members != null && members.Length > 0)
+        {
+            var attr = Attribute.GetCustomAttribute(members[0], typeof(InspectorNameAttribute)) as InspectorNameAttribute;
+            if (attr != null && !string.IsNullOrEmpty(attr.displayName))
+                return attr.displayName;
+        }
+
+        // Fallback to enum name when no attribute is present.
+        return category.ToString();
+    }
 }
 
 /// <summary>

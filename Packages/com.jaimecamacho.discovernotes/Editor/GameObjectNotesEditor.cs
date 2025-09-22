@@ -27,8 +27,12 @@ public class GameObjectNotesEditor : Editor
     const float ICON_PAD = 6f;
 
     static readonly GUIContent DiscoverHeaderContent = new GUIContent("Discover (documentación visual)");
-    static readonly GUIContent DiscoverTitleContent = new GUIContent("Título");
-    static readonly GUIContent DiscoverCategoryContent = new GUIContent("Categoría Discover");
+    static readonly GUIContent NoteTitleContent = new GUIContent(
+        "Título de la nota",
+        "Nombre corto y descriptivo que se mostrará en la tarjeta, el tooltip y el encabezado Discover.");
+    static readonly GUIContent DiscoverDisciplineContent = new GUIContent(
+        "Área",
+        "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
     static readonly GUIContent DiscoverSummaryContent = new GUIContent("Resumen");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
@@ -114,7 +118,7 @@ public class GameObjectNotesEditor : Editor
 
                 GUILayout.BeginVertical(cardStyle);
 
-                DrawHeaderToolbar_PerNote(pMode, showTitle: true);
+                DrawHeaderToolbar_PerNote(pNote, pMode);
                 DrawEditableMeta_PerNote(pNote);
                 DrawEditableNotes_PlainAutoHeight_PerNote(pNote, i);
                 DrawDiscoverContent_Edit(pNote);
@@ -123,6 +127,7 @@ public class GameObjectNotesEditor : Editor
             }
             else
             {
+                DrawHeaderToolbar_PerNote(pNote, pMode);
                 DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
                 DrawDiscoverContent_Fixed(pNote);
             }
@@ -204,11 +209,29 @@ public class GameObjectNotesEditor : Editor
     }
 
     // ---------- Header ----------
-    void DrawHeaderToolbar_PerNote(SerializedProperty pMode, bool showTitle)
+    void DrawHeaderToolbar_PerNote(SerializedProperty pNote, SerializedProperty pMode)
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (showTitle) EditorGUILayout.LabelField("Nota", EditorStyles.boldLabel);
+            string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
+            if (string.IsNullOrWhiteSpace(title))
+                title = pNote.FindPropertyRelative("category")?.stringValue ?? "Nota";
+            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+
+            var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
+            var discipline = pDiscipline != null
+                ? DiscoverCategoryUtility.GetDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
+                : DiscoverCategoryUtility.GetDisplayName(DiscoverCategory.Other);
+
+            string severity = pNote.FindPropertyRelative("category")?.stringValue;
+            if (string.IsNullOrWhiteSpace(severity)) severity = "Info";
+
+            var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
+            var badgeStyle = EditorStyles.miniLabel;
+            var badgeSize = badgeStyle.CalcSize(badgeContent);
+            GUILayout.Space(6f);
+            GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
+
             GUILayout.FlexibleSpace();
 
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
@@ -254,21 +277,30 @@ public class GameObjectNotesEditor : Editor
     // ---------- Meta ----------
     void DrawEditableMeta_PerNote(SerializedProperty pNote)
     {
+        var pTitle = pNote.FindPropertyRelative("discoverName");
+        if (pTitle != null)
+        {
+            EditorGUILayout.PropertyField(pTitle, NoteTitleContent);
+        }
+
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");
+        var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
         var pDate = pNote.FindPropertyRelative("dateCreated");
 
         float rowH = Mathf.Max(EditorGUIUtility.singleLineHeight + 6f, 22f);
         Rect row = EditorGUILayout.GetControlRect(false, rowH);
 
         float gap = 8f;
-        float half = (row.width - gap) * 0.5f;
+        float third = Mathf.Max(10f, (row.width - gap * 2f) / 3f);
 
-        Rect left = new Rect(row.x, row.y, half, row.height);
-        Rect right = new Rect(left.xMax + gap, row.y, half, row.height);
+        Rect severityRect = new Rect(row.x, row.y, third, row.height);
+        Rect disciplineRect = new Rect(severityRect.xMax + gap, row.y, third, row.height);
+        Rect authorRect = new Rect(disciplineRect.xMax + gap, row.y, third, row.height);
 
-        EditorIconHelper.DrawIconPopupCategory(left, pCategory, NoteStylesProvider.GetCategoryNames());
-        EditorIconHelper.DrawIconPopupAuthor(right, pAuthor, NoteStylesProvider.GetAuthors());
+        EditorIconHelper.DrawIconPopupCategory(severityRect, pCategory, NoteStylesProvider.GetCategoryNames());
+        DrawDiscoverDisciplinePopup(disciplineRect, pDiscipline);
+        EditorIconHelper.DrawIconPopupAuthor(authorRect, pAuthor, NoteStylesProvider.GetAuthors());
 
         // Botón fecha con popup anclado al click real
         Rect row2 = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4);
@@ -300,6 +332,31 @@ public class GameObjectNotesEditor : Editor
                 serializedObject.ApplyModifiedProperties();
             }));
         }
+    }
+
+
+    void DrawDiscoverDisciplinePopup(Rect rect, SerializedProperty pDiscipline)
+    {
+        if (pDiscipline == null)
+        {
+            EditorGUI.LabelField(rect, DiscoverDisciplineContent, new GUIContent(""));
+            return;
+        }
+
+        EditorGUI.BeginProperty(rect, DiscoverDisciplineContent, pDiscipline);
+        Rect popupRect = EditorGUI.PrefixLabel(rect, DiscoverDisciplineContent);
+        int current = Mathf.Clamp(pDiscipline.enumValueIndex, 0, DiscoverCategoryUtility.Values.Count - 1);
+        string[] names = DiscoverCategoryUtility.GetDisplayNamesCopy();
+        if (names.Length == 0)
+        {
+            pDiscipline.enumValueIndex = (int)DiscoverCategory.Other;
+            EditorGUI.EndProperty();
+            return;
+        }
+
+        int newIdx = EditorGUI.Popup(popupRect, current, names);
+        if (newIdx != current) pDiscipline.enumValueIndex = newIdx;
+        EditorGUI.EndProperty();
     }
 
 
@@ -416,8 +473,6 @@ public class GameObjectNotesEditor : Editor
         EditorGUILayout.LabelField(DiscoverHeaderContent, EditorStyles.boldLabel);
         using (new EditorGUI.IndentLevelScope())
         {
-            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverName"), DiscoverTitleContent);
-            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverCategory"), DiscoverCategoryContent);
             EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverImage"), DiscoverImageContent);
             EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSummary"), DiscoverSummaryContent);
             EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSections"), DiscoverSectionsContent, true);
@@ -426,18 +481,15 @@ public class GameObjectNotesEditor : Editor
 
     void DrawDiscoverContent_Fixed(SerializedProperty pNote)
     {
-        var pName = pNote.FindPropertyRelative("discoverName");
-        var pCategory = pNote.FindPropertyRelative("discoverCategory");
         var pImage = pNote.FindPropertyRelative("discoverImage");
         var pSummary = pNote.FindPropertyRelative("discoverSummary");
         var pSections = pNote.FindPropertyRelative("discoverSections");
 
-        bool hasName = pName != null && !string.IsNullOrWhiteSpace(pName.stringValue);
         bool hasSummary = pSummary != null && !string.IsNullOrWhiteSpace(pSummary.stringValue);
         bool hasImage = pImage != null && pImage.objectReferenceValue != null;
         bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
 
-        if (!hasName && !hasSummary && !hasImage && !hasSections)
+        if (!hasSummary && !hasImage && !hasSections)
             return;
 
         GUILayout.Space(6);
@@ -446,14 +498,6 @@ public class GameObjectNotesEditor : Editor
             EditorGUILayout.LabelField("Discover", EditorStyles.boldLabel);
             using (new EditorGUI.IndentLevelScope())
             {
-                if (hasName)
-                    EditorGUILayout.LabelField(pName.stringValue, EditorStyles.label);
-
-                string catLabel = pCategory != null
-                    ? ((DiscoverCategory)pCategory.enumValueIndex).ToString()
-                    : DiscoverCategory.Other.ToString();
-                EditorGUILayout.LabelField("Categoría", catLabel, EditorStyles.miniLabel);
-
                 if (hasImage)
                 {
                     var tex = pImage.objectReferenceValue as Texture2D;
@@ -582,6 +626,16 @@ public class GameObjectNotesEditor : Editor
         string category = pNote.FindPropertyRelative("category").stringValue ?? "Info";
         string author = pNote.FindPropertyRelative("author").stringValue;
         string date = pNote.FindPropertyRelative("dateCreated").stringValue;
+        string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
+        if (string.IsNullOrWhiteSpace(title)) title = category;
+
+        var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
+        var discipline = pDiscipline != null
+            ? DiscoverCategoryUtility.GetDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
+            : DiscoverCategoryUtility.GetDisplayName(DiscoverCategory.Other);
+
+        string authorLabel = string.IsNullOrEmpty(author) ? "Anónimo" : author;
+        string dateLabel = string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date;
         var pBody = pNote.FindPropertyRelative("notes");
         string raw = pBody.stringValue ?? string.Empty;
 
@@ -594,7 +648,7 @@ public class GameObjectNotesEditor : Editor
         if (!s_preview.TryGetValue(key, out var cache)) { cache = new PreviewCache(); s_preview[key] = cache; }
 
         int textHash = raw.GetHashCode();
-        int metaHash = (category + "|" + author + "|" + date).GetHashCode();
+        int metaHash = (category + "|" + authorLabel + "|" + dateLabel + "|" + discipline + "|" + title).GetHashCode();
         float availWidth = EditorGUIUtility.currentViewWidth - 20f;
         if (availWidth <= 0f) availWidth = 400f;
 
@@ -609,7 +663,7 @@ public class GameObjectNotesEditor : Editor
             cache.accent = accent;
 
             cache.icon = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(category)?.image);
-            cache.titleGC = new GUIContent($"<b>{category}</b>  •  {(string.IsNullOrEmpty(author) ? "Anónimo" : author)}  •  {(string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date)}");
+            cache.titleGC = new GUIContent($"<b>{title}</b>\n{category} • {discipline} • {authorLabel} • {dateLabel}");
 
             cache.links.Clear(); cache.checks.Clear(); cache.images.Clear();
             string displayStyled = LinkMarkup.BuildStyled(raw, cache.links, cache.checks, cache.images, out cache.indexMap);
