@@ -42,15 +42,14 @@ public class GameObjectNotes : MonoBehaviour
         public string dateCreated = "";         // dd/MM/yyyy
         public string category = "Info";
 
-        [Header("Discover – Información General")]
-        public string discoverName = "Discover";
+        public string discoverName = string.Empty;
         public DiscoverCategory discoverCategory = DiscoverCategory.Other;
         public Texture2D discoverImage;
 
         [TextArea(2, 10)]
         public string discoverSummary = "";
 
-        [Header("Discover – Contenido estructurado")]
+        [Header("Contenido estructurado")]
         public List<DiscoverSection> discoverSections = new List<DiscoverSection>();
 
         [Header("Notas detalladas (texto plano)")]
@@ -119,7 +118,7 @@ public class GameObjectNotes : MonoBehaviour
             if (string.IsNullOrEmpty(n.dateCreated))
                 n.dateCreated = DateTime.Now.ToString("dd/MM/yyyy");
 
-            if (string.IsNullOrEmpty(n.discoverName))
+            if (string.IsNullOrEmpty(n.discoverName) || n.discoverName == "Discover")
                 n.discoverName = gameObject.name;
 
             if (n.discoverSections == null)

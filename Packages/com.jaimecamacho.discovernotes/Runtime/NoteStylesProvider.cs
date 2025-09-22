@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using UnityEngine;
 using UnityEditor;
 using System.IO;
@@ -9,7 +10,9 @@ public static class NoteStylesProvider
     // === Ruta relativa: una carpeta por encima del script que crea el asset ===
     public static string StylesAssetPath => ComputeAssetPath();
 
-    // Cachés: evitan tocar AssetDatabase en cada repintado del inspector
+    static string[] s_cachedDisciplineNames = new string[0];
+        s_cachedDisciplineNames = new string[0];
+    // CachÃ©s: evitan tocar AssetDatabase en cada repintado del inspector
     static NoteStyles s_cachedStyles;
     static string[] s_cachedAuthors = new string[0];
     static string[] s_cachedCategoryNames = new string[0];
@@ -20,7 +23,7 @@ public static class NoteStylesProvider
     [InitializeOnLoadMethod]
     static void Init()
     {
-        // Cuando cambie el proyecto/asset DB, invalidamos cachés
+        // Cuando cambie el proyecto/asset DB, invalidamos cachÃ©s
         EditorApplication.projectChanged += ClearCaches;
         AssemblyReloadEvents.beforeAssemblyReload += ClearCaches;
         // Asegurar que exista el asset
@@ -46,7 +49,7 @@ public static class NoteStylesProvider
 
         if (styles == null)
         {
-            // ¿Existe en otro sitio? (auto-migración)
+            // Â¿Existe en otro sitio? (auto-migraciÃ³n)
             var anyGuid = AssetDatabase.FindAssets("t:NoteStyles").FirstOrDefault();
             if (!string.IsNullOrEmpty(anyGuid))
             {
@@ -60,7 +63,7 @@ public static class NoteStylesProvider
                         var err = AssetDatabase.MoveAsset(existingPath, path);
                         if (!string.IsNullOrEmpty(err))
                         {
-                            Debug.LogWarning($"NoteStyles: no se pudo mover automáticamente: {err}. Usando el existente en {existingPath}");
+                            Debug.LogWarning($"NoteStyles: no se pudo mover automÃ¡ticamente: {err}. Usando el existente en {existingPath}");
                             s_cachedStyles = existing;
                             BuildSimpleCaches();
                             return s_cachedStyles;
@@ -92,13 +95,54 @@ public static class NoteStylesProvider
         if (s_cachedStyles == null) return;
         s_cachedAuthors = (s_cachedStyles.authors != null && s_cachedStyles.authors.Count > 0)
             ? s_cachedStyles.authors.Where(a => !string.IsNullOrEmpty(a)).ToArray()
-            : new[] { "Anónimo" };
+        var values = DiscoverCategoryUtility.Values;
+        if (values != null && values.Count > 0)
+        {
+            var names = new string[values.Count];
+            for (int i = 0; i < values.Count; i++)
+            {
+                string overrideName = (s_cachedStyles.discoverDisciplines != null && i < s_cachedStyles.discoverDisciplines.Count)
+                    ? s_cachedStyles.discoverDisciplines[i]
+                    : null;
+                names[i] = !string.IsNullOrWhiteSpace(overrideName)
+                    ? overrideName.Trim()
+                    : DiscoverCategoryUtility.GetDisplayName(values[i]);
+            }
+            s_cachedDisciplineNames = names;
+        }
+        else
+        {
+            s_cachedDisciplineNames = new string[0];
+        }
+
+    public static string[] GetDisciplineNamesCopy()
+    {
+        if (s_cachedDisciplineNames == null || s_cachedDisciplineNames.Length == 0)
+            return DiscoverCategoryUtility.GetDisplayNamesCopy();
+
+        var copy = new string[s_cachedDisciplineNames.Length];
+        Array.Copy(s_cachedDisciplineNames, copy, copy.Length);
+        return copy;
+    }
+
+    public static string GetDisciplineDisplayName(DiscoverCategory category)
+    {
+        int idx = (int)category;
+        if (s_cachedDisciplineNames != null && idx >= 0 && idx < s_cachedDisciplineNames.Length)
+        {
+            string name = s_cachedDisciplineNames[idx];
+            if (!string.IsNullOrEmpty(name)) return name;
+        }
+        return DiscoverCategoryUtility.GetDisplayName(category);
+    }
+
+            : new[] { "AnÃ³nimo" };
 
         s_cachedCategoryNames = (s_cachedStyles.categories != null)
             ? s_cachedStyles.categories.Where(c => c != null && !string.IsNullOrEmpty(c.name)).Select(c => c.name).ToArray()
             : new string[0];
 
-        // Invalida última categoría cacheada
+        // Invalida Ãºltima categorÃ­a cacheada
         s_lastCategory = null;
         s_lastCategoryForFind = null;
     }
@@ -125,7 +169,7 @@ public static class NoteStylesProvider
 
     public static string[] GetCategoryNames() => s_cachedCategoryNames ?? new string[0];
 
-    public static string[] GetAuthors() => s_cachedAuthors ?? new[] { "Anónimo" };
+    public static string[] GetAuthors() => s_cachedAuthors ?? new[] { "AnÃ³nimo" };
 
     [MenuItem("Tools/Notes/Open NoteStyles")]
     public static void SelectStylesAsset()
@@ -138,7 +182,7 @@ public static class NoteStylesProvider
     // ---------- Helpers ----------
     static string ComputeAssetPath()
     {
-        // Cachea ruta del propio script para evitar búsquedas repetidas
+        // Cachea ruta del propio script para evitar bÃºsquedas repetidas
         if (string.IsNullOrEmpty(s_cachedScriptPath))
         {
             var guids = AssetDatabase.FindAssets("t:MonoScript NoteStylesProvider");

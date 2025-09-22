@@ -17,7 +17,7 @@ public class NoteStyles : ScriptableObject
     [Header("Authors (dropdown)")]
     public List<string> authors = new List<string>
     {
-        "Carlos","David","Avelino","Gaspar","Anónimo"
+        "Carlos","David","Avelino","Gaspar","Annimo"
     };
 
     [Header("Categories")]
@@ -48,5 +48,18 @@ public class NoteStyles : ScriptableObject
             tooltipAccentBar=new Color(1.00f,1f,1f,1f),
             tooltipBackground=new Color(0.6f,0.6f,0.6f,1f)
         }
+    };
+
+    [Header("Discover disciplines (dropdown)")]
+    public List<string> discoverDisciplines = new List<string>
+    {
+        "FX",
+        "Audio",
+        "Gameplay",
+        "UI / UX",
+        "Environment",
+        "Systems / Code",
+        "Workflow / Pipeline",
+        "Other"
     };
 }

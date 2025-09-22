@@ -44,3 +44,13 @@ MonoBehaviour:
     cardBackground: {r: 1, g: 1, b: 1, a: 0.3}
     tooltipAccentBar: {r: 1, g: 1, b: 1, a: 1}
     tooltipBackground: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+  discoverDisciplines:
+  - FX
+  - Audio
+  - Gameplay
+  - UI / UX
+  - Environment
+  - Systems / Code
+  - Workflow / Pipeline
+  - Other
+
