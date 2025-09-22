@@ -174,6 +174,8 @@ public static class NoteStylesProvider
 
     public static string[] GetDisciplineNamesCopy()
     {
+        GetOrCreateStyles();
+
         if (s_cachedDisciplineNames == null || s_cachedDisciplineNames.Length == 0)
             return DiscoverCategoryUtility.GetDisplayNamesCopy();
 
@@ -184,10 +186,11 @@ public static class NoteStylesProvider
 
     public static string GetDisciplineDisplayName(DiscoverCategory category)
     {
+        var names = GetDisciplineNamesCopy();
         int idx = (int)category;
-        if (s_cachedDisciplineNames != null && idx >= 0 && idx < s_cachedDisciplineNames.Length)
+        if (names != null && idx >= 0 && idx < names.Length)
         {
-            string name = s_cachedDisciplineNames[idx];
+            string name = names[idx];
             if (!string.IsNullOrEmpty(name))
                 return name;
         }
