@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -25,6 +25,14 @@ public class GameObjectNotesEditor : Editor
     const float PADDING = 10f;
     const float ICON = 16f;
     const float ICON_PAD = 6f;
+
+    static readonly GUIContent DiscoverHeaderContent = new GUIContent("Discover (documentación visual)");
+    static readonly GUIContent DiscoverTitleContent = new GUIContent("Título");
+    static readonly GUIContent DiscoverCategoryContent = new GUIContent("Categoría Discover");
+    static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
+    static readonly GUIContent DiscoverSummaryContent = new GUIContent("Resumen");
+    static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
+    static readonly GUIContent ActionsLabelContent = new GUIContent("Acciones");
 
     // Edición en TextArea (plana con scrollbar)
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
@@ -79,7 +87,7 @@ public class GameObjectNotesEditor : Editor
 
         if (pList.arraySize == 0)
         {
-            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → “Añadir nota”.", MessageType.Info);
+            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → "Añadir nota".", MessageType.Info);
         }
 
         // Dibuja cada nota como una tarjeta independiente
@@ -109,12 +117,14 @@ public class GameObjectNotesEditor : Editor
                 DrawHeaderToolbar_PerNote(pMode, showTitle: true);
                 DrawEditableMeta_PerNote(pNote);
                 DrawEditableNotes_PlainAutoHeight_PerNote(pNote, i);
+                DrawDiscoverContent_Edit(pNote);
 
                 GUILayout.EndVertical();
             }
             else
             {
                 DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
+                DrawDiscoverContent_Fixed(pNote);
             }
 
             GUILayout.Space(4);
@@ -396,6 +406,160 @@ public class GameObjectNotesEditor : Editor
 
             e.Use();
             GUI.changed = true;
+        }
+    }
+
+
+    void DrawDiscoverContent_Edit(SerializedProperty pNote)
+    {
+        GUILayout.Space(8);
+        EditorGUILayout.LabelField(DiscoverHeaderContent, EditorStyles.boldLabel);
+        using (new EditorGUI.IndentLevelScope())
+        {
+            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverName"), DiscoverTitleContent);
+            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverCategory"), DiscoverCategoryContent);
+            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverImage"), DiscoverImageContent);
+            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSummary"), DiscoverSummaryContent);
+            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSections"), DiscoverSectionsContent, true);
+        }
+    }
+
+    void DrawDiscoverContent_Fixed(SerializedProperty pNote)
+    {
+        var pName = pNote.FindPropertyRelative("discoverName");
+        var pCategory = pNote.FindPropertyRelative("discoverCategory");
+        var pImage = pNote.FindPropertyRelative("discoverImage");
+        var pSummary = pNote.FindPropertyRelative("discoverSummary");
+        var pSections = pNote.FindPropertyRelative("discoverSections");
+
+        bool hasName = pName != null && !string.IsNullOrWhiteSpace(pName.stringValue);
+        bool hasSummary = pSummary != null && !string.IsNullOrWhiteSpace(pSummary.stringValue);
+        bool hasImage = pImage != null && pImage.objectReferenceValue != null;
+        bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
+
+        if (!hasName && !hasSummary && !hasImage && !hasSections)
+            return;
+
+        GUILayout.Space(6);
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Discover", EditorStyles.boldLabel);
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (hasName)
+                    EditorGUILayout.LabelField(pName.stringValue, EditorStyles.label);
+
+                string catLabel = pCategory != null
+                    ? ((DiscoverCategory)pCategory.enumValueIndex).ToString()
+                    : DiscoverCategory.Other.ToString();
+                EditorGUILayout.LabelField("Categoría", catLabel, EditorStyles.miniLabel);
+
+                if (hasImage)
+                {
+                    var tex = pImage.objectReferenceValue as Texture2D;
+                    if (tex != null)
+                    {
+                        float maxHeight = 140f;
+                        GUILayout.Label(tex, GUILayout.Height(Mathf.Min(maxHeight, tex.height)));
+                    }
+                }
+
+                if (hasSummary)
+                {
+                    EditorGUILayout.LabelField(pSummary.stringValue, EditorStyles.wordWrappedLabel);
+                }
+
+                DrawDiscoverSectionsFixed(pSections);
+            }
+        }
+    }
+
+    void DrawDiscoverSectionsFixed(SerializedProperty pSections)
+    {
+        if (pSections == null || !pSections.isArray || pSections.arraySize == 0) return;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Secciones", EditorStyles.boldLabel);
+
+        for (int i = 0; i < pSections.arraySize; i++)
+        {
+            var pSection = pSections.GetArrayElementAtIndex(i);
+            if (pSection == null) continue;
+
+            var pSecName = pSection.FindPropertyRelative("sectionName");
+            var pSecImage = pSection.FindPropertyRelative("image");
+            var pSecContent = pSection.FindPropertyRelative("sectionContent");
+            var pActions = pSection.FindPropertyRelative("actions");
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                string secName = (pSecName != null && !string.IsNullOrWhiteSpace(pSecName.stringValue))
+                    ? pSecName.stringValue
+                    : $"Sección {i + 1}";
+                EditorGUILayout.LabelField(secName, EditorStyles.boldLabel);
+
+                if (pSecImage != null && pSecImage.objectReferenceValue is Texture2D secTex)
+                {
+                    GUILayout.Label(secTex, GUILayout.Height(Mathf.Min(100f, secTex.height)));
+                }
+
+                if (pSecContent != null && !string.IsNullOrWhiteSpace(pSecContent.stringValue))
+                {
+                    EditorGUILayout.LabelField(pSecContent.stringValue, EditorStyles.wordWrappedLabel);
+                }
+
+                DrawDiscoverActionsFixed(pActions);
+            }
+        }
+    }
+
+    void DrawDiscoverActionsFixed(SerializedProperty pActions)
+    {
+        if (pActions == null || !pActions.isArray || pActions.arraySize == 0) return;
+
+        EditorGUILayout.Space(2);
+        EditorGUILayout.LabelField(ActionsLabelContent, EditorStyles.miniBoldLabel);
+
+        for (int i = 0; i < pActions.arraySize; i++)
+        {
+            var pAction = pActions.GetArrayElementAtIndex(i);
+            if (pAction == null) continue;
+
+            var pDesc = pAction.FindPropertyRelative("description");
+            var pTarget = pAction.FindPropertyRelative("target");
+            var pHint = pAction.FindPropertyRelative("hint");
+
+            string desc = (pDesc != null && !string.IsNullOrWhiteSpace(pDesc.stringValue))
+                ? pDesc.stringValue
+                : $"Acción {i + 1}";
+            EditorGUILayout.LabelField(desc, EditorStyles.label);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.ObjectField(GUIContent.none, pTarget?.objectReferenceValue, typeof(GameObject), true);
+                }
+
+                using (new EditorGUI.DisabledScope(pTarget == null || pTarget.objectReferenceValue == null))
+                {
+                    if (GUILayout.Button("Ir", GUILayout.Width(40f)))
+                    {
+                        var go = pTarget.objectReferenceValue as GameObject;
+                        if (go != null)
+                        {
+                            Selection.activeObject = go;
+                            if (SceneView.lastActiveSceneView != null)
+                                SceneView.lastActiveSceneView.FrameSelected();
+                        }
+                    }
+                }
+            }
+
+            if (pHint != null && !string.IsNullOrWhiteSpace(pHint.stringValue))
+            {
+                EditorGUILayout.LabelField(pHint.stringValue, EditorStyles.wordWrappedMiniLabel);
+            }
         }
     }
 

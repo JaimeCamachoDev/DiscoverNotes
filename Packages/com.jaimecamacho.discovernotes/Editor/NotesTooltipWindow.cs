@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -152,7 +152,49 @@ public class NotesTooltipWindow : EditorWindow
 
     void PrepareContent_PerNote()
     {
-        string raw = (_noteData?.notes ?? string.Empty).Trim();
+        var sb = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(_noteData?.discoverName))
+        {
+            sb.AppendLine(_noteData.discoverName.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(_noteData?.discoverSummary))
+        {
+            sb.AppendLine(_noteData.discoverSummary.Trim());
+            sb.AppendLine();
+        }
+
+        if (_noteData?.discoverSections != null && _noteData.discoverSections.Count > 0)
+        {
+            int added = 0;
+            foreach (var section in _noteData.discoverSections)
+            {
+                if (section == null) continue;
+                bool hasName = !string.IsNullOrWhiteSpace(section.sectionName);
+                bool hasContent = !string.IsNullOrWhiteSpace(section.sectionContent);
+                if (!hasName && !hasContent) continue;
+
+                sb.Append("• ");
+                if (hasName) sb.Append(section.sectionName.Trim());
+                if (hasContent)
+                {
+                    if (hasName) sb.Append(": ");
+                    sb.Append(section.sectionContent.Trim());
+                }
+                sb.AppendLine();
+
+                added++;
+                if (added >= 4) break;
+            }
+            if (added > 0) sb.AppendLine();
+        }
+
+        string baseNotes = _noteData?.notes ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(baseNotes))
+            sb.Append(baseNotes.Trim());
+
+        string raw = sb.ToString().Trim();
         if (raw.Length > 2000) raw = raw.Substring(0, 2000) + "…";
 
         string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;

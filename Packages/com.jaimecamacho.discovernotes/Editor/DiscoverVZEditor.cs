@@ -13,7 +13,35 @@ public class DiscoverVZEditor : Editor
     {
         DiscoverVZ discover = (DiscoverVZ)target;
 
-        // Bot髇 de edici髇
+        EditorGUILayout.HelpBox(
+            "DiscoverVZ es un componente legacy. Usa GameObjectNotes para gestionar notas y documentaci贸n visual.",
+            MessageType.Warning);
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Convertir a GameObjectNotes"))
+            {
+                discover.ConvertAndRemove();
+                return;
+            }
+
+            var notes = discover.GetComponent<GameObjectNotes>();
+            if (notes == null)
+            {
+                if (GUILayout.Button("A帽adir GameObjectNotes"))
+                {
+                    Undo.AddComponent<GameObjectNotes>(discover.gameObject);
+                }
+            }
+            else if (GUILayout.Button("Seleccionar GameObjectNotes"))
+            {
+                Selection.activeObject = notes;
+            }
+        }
+
+        EditorGUILayout.Space();
+
+        // Bot贸n de edici贸n
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField(discover.category.ToString(), EditorStyles.miniLabel);
         GUILayout.FlexibleSpace();
@@ -25,7 +53,7 @@ public class DiscoverVZEditor : Editor
 
         if (isEditing)
         {
-            // Modo Edici髇
+            // Modo Edici贸n
             discover.discoverName = EditorGUILayout.TextField("Name", discover.discoverName);
             discover.category = (DiscoverVZ.DiscoverCategory)EditorGUILayout.EnumPopup("Category", discover.category);
             discover.image = (Texture2D)EditorGUILayout.ObjectField("Image", discover.image, typeof(Texture2D), false);
@@ -40,7 +68,7 @@ public class DiscoverVZEditor : Editor
                 discover.sections[i].image = (Texture2D)EditorGUILayout.ObjectField("Image", discover.sections[i].image, typeof(Texture2D), false);
                 discover.sections[i].sectionContent = EditorGUILayout.TextArea(discover.sections[i].sectionContent, GUILayout.Height(40));
 
-                // Acciones dentro de la secci髇
+                // Acciones dentro de la secci贸n
                 EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
                 for (int j = 0; j < discover.sections[i].actions.Count; j++)
                 {
@@ -95,7 +123,7 @@ public class DiscoverVZEditor : Editor
                 }
                 EditorGUILayout.LabelField(section.sectionContent, EditorStyles.wordWrappedLabel);
 
-                // Acciones dentro de la secci髇
+                // Acciones dentro de la secci贸n
                 if (section.actions.Count > 0)
                 {
                     EditorGUILayout.Space();
