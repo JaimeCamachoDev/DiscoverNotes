@@ -88,17 +88,17 @@ public static class DiscoverCategoryUtility
 [Serializable]
 public class DiscoverSection
 {
-    [Tooltip("Title displayed for this section inside the Discover note.")]
-    public string sectionName = "Section";
-
-    [Tooltip("Optional representative image. Useful for quick visual references or diagrams.")]
+    public string sectionName;
     public Texture2D image;
 
-    [TextArea]
-    [Tooltip("Long form description or Markdown-like content for the section.")]
-    public string sectionContent = "Section Content";
+    // NUEVO: objeto objetivo de la sección
+    public GameObject target;
 
-    [Tooltip("Contextual actions such as scene jumps or asset selections associated with the section.")]
+    [TextArea(2, 6)]
+    public string sectionContent;
+
+    // Oculto: antiguo sistema de acciones (mantener temporalmente por compatibilidad)
+    [HideInInspector, Obsolete("Actions eliminado. Usa 'target' en la sección.")]
     public List<DiscoverAction> actions = new List<DiscoverAction>();
 }
 

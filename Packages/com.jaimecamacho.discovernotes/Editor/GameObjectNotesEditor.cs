@@ -2,9 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
-using System.Text.RegularExpressions;
+using static System.Collections.Specialized.BitVector32;
+using static UnityEngine.GraphicsBuffer;
 
 
 [CustomEditor(typeof(GameObjectNotes))]
@@ -541,6 +543,34 @@ public class GameObjectNotesEditor : Editor
         }
 
         DrawDiscoverSectionsFixed(pSections);
+        // --- Nuevo: Target por sección (debajo de la imagen) ---
+        var pTarget = pSections.FindPropertyRelative("target");
+        if (pTarget != null)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                    {
+                        // Campo de solo lectura
+                        using (new EditorGUI.DisabledScope(true))
+                             {
+                    EditorGUILayout.ObjectField(GUIContent.none, pTarget.objectReferenceValue, typeof(GameObject), true);
+                             }
+                
+                         // Botón Ir (mismo patrón que antes con Actions)
+                         using (new EditorGUI.DisabledScope(pTarget.objectReferenceValue == null))
+                            {
+                                 if (GUILayout.Button("Ir", GUILayout.Width(40f)))
+                                    {
+                        var go = pTarget.objectReferenceValue as GameObject;
+                                         if (go != null)
+                                             {
+                            Selection.activeObject = go;
+                                                 if (SceneView.lastActiveSceneView != null)
+                                SceneView.lastActiveSceneView.FrameSelected();
+                                             }
+                                     }
+                            }
+                     }
+             }
         GUILayout.EndVertical();
     }
 
