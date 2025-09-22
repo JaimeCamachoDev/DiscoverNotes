@@ -55,7 +55,7 @@ public class DiscoverVZEditor : Editor
         {
             // Modo Edición
             discover.discoverName = EditorGUILayout.TextField("Name", discover.discoverName);
-            discover.category = (DiscoverVZ.DiscoverCategory)EditorGUILayout.EnumPopup("Category", discover.category);
+            discover.category = (DiscoverCategory)EditorGUILayout.EnumPopup("Category", discover.category);
             discover.image = (Texture2D)EditorGUILayout.ObjectField("Image", discover.image, typeof(Texture2D), false);
             discover.description = EditorGUILayout.TextArea(discover.description, GUILayout.Height(50));
 
