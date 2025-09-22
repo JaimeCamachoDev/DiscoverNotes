@@ -33,7 +33,6 @@ public class GameObjectNotesEditor : Editor
         "Área",
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
-    static readonly GUIContent DiscoverSummaryContent = new GUIContent("Resumen");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
     static readonly GUIContent ActionsLabelContent = new GUIContent("Acciones");
 
@@ -344,8 +343,7 @@ public class GameObjectNotesEditor : Editor
         }
 
         EditorGUI.BeginProperty(rect, DiscoverDisciplineContent, pDiscipline);
-        Rect popupRect = EditorGUI.PrefixLabel(rect, DiscoverDisciplineContent);
-        int current = Mathf.Clamp(pDiscipline.enumValueIndex, 0, DiscoverCategoryUtility.Values.Count - 1);
+
         string[] names = NoteStylesProvider.GetDisciplineNamesCopy();
         if (names.Length == 0)
         {
@@ -354,8 +352,18 @@ public class GameObjectNotesEditor : Editor
             return;
         }
 
-        int newIdx = EditorGUI.Popup(popupRect, current, names);
-        if (newIdx != current) pDiscipline.enumValueIndex = newIdx;
+        int current = Mathf.Clamp(pDiscipline.enumValueIndex, 0, names.Length - 1);
+        if (current != pDiscipline.enumValueIndex)
+            pDiscipline.enumValueIndex = current;
+
+        int prevIndent = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+        EditorGUI.BeginChangeCheck();
+        int newIdx = EditorGUI.Popup(rect, DiscoverDisciplineContent, current, names);
+        if (EditorGUI.EndChangeCheck())
+            pDiscipline.enumValueIndex = newIdx;
+        EditorGUI.indentLevel = prevIndent;
+
         EditorGUI.EndProperty();
     }
 
@@ -477,7 +485,6 @@ public class GameObjectNotesEditor : Editor
         using (new EditorGUI.IndentLevelScope())
         {
             EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverImage"), DiscoverImageContent);
-            EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSummary"), DiscoverSummaryContent);
             EditorGUILayout.PropertyField(pNote.FindPropertyRelative("discoverSections"), DiscoverSectionsContent, true);
         }
     }
@@ -486,14 +493,12 @@ public class GameObjectNotesEditor : Editor
     void DrawDiscoverContent_Fixed(SerializedProperty pNote)
     {
         var pImage = pNote.FindPropertyRelative("discoverImage");
-        var pSummary = pNote.FindPropertyRelative("discoverSummary");
         var pSections = pNote.FindPropertyRelative("discoverSections");
 
-        bool hasSummary = pSummary != null && !string.IsNullOrWhiteSpace(pSummary.stringValue);
         bool hasImage = pImage != null && pImage.objectReferenceValue != null;
         bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
 
-        if (!hasSummary && !hasImage && !hasSections)
+        if (!hasImage && !hasSections)
             return;
 
         GUILayout.Space(6);
@@ -523,12 +528,6 @@ public class GameObjectNotesEditor : Editor
                 DrawTextureWithAspect(tex, 180f);
                 GUILayout.Space(4);
             }
-        }
-
-        if (hasSummary)
-        {
-            EditorGUILayout.LabelField(pSummary.stringValue, EditorStyles.wordWrappedLabel);
-            GUILayout.Space(4);
         }
 
         DrawDiscoverSectionsFixed(pSections);
