@@ -55,6 +55,8 @@ public class GameObjectNotesEditor : Editor
         public Color bg, accent;
 
         public GUIContent titleGC, bodyGC;
+        GUIContent metaGC;               // línea de metadatos ya montada y encogida
+        string _metaCat, _metaAuthor, _metaDate; // piezas en bruto para construir meta
         public float titleH, bodyH, innerWidth;
         public Texture icon;
         public bool preferDark;
@@ -127,9 +129,12 @@ public class GameObjectNotesEditor : Editor
             }
             else
             {
-              
-                DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
-                DrawDiscoverContent_Fixed(pNote);
+
+                bool collapsed = DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
+                if (!collapsed)
+                {
+                    DrawDiscoverContent_Fixed(pNote);
+                }
             }
 
             GUILayout.Space(4);
@@ -509,12 +514,11 @@ public class GameObjectNotesEditor : Editor
 
         bool hasImage = pImage != null && pImage.objectReferenceValue != null;
         bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
-
-        if (!hasImage && !hasSections)
-            return;
+        if (!hasImage && !hasSections) return;
 
         GUILayout.Space(6);
 
+        // Fondo de bloque con el color de la categoría
         string categoryName = pNote.FindPropertyRelative("category")?.stringValue;
         var cat = NoteStylesProvider.FindCategory(categoryName);
         var blockBg = (cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 1f));
@@ -527,11 +531,10 @@ public class GameObjectNotesEditor : Editor
         }
 
         GUILayout.BeginVertical(cardStyle);
-        string discoverTitle = pNote.FindPropertyRelative("discoverName")?.stringValue;
-        if (string.IsNullOrWhiteSpace(discoverTitle))
-            discoverTitle = "Documentacin visual";
-        EditorGUILayout.LabelField(discoverTitle, EditorStyles.boldLabel);
 
+        // (QUITADO) — No pintamos un título interno para evitar el "Humo" duplicado
+
+        // Imagen principal (opcional)
         if (hasImage)
         {
             var tex = pImage.objectReferenceValue as Texture2D;
@@ -542,44 +545,23 @@ public class GameObjectNotesEditor : Editor
             }
         }
 
+        // Secciones (cada sección ya dibuja su Target debajo de su imagen)
         DrawDiscoverSectionsFixed(pSections);
-        // --- Nuevo: Target por sección (debajo de la imagen) ---
-        var pTarget = pSections.FindPropertyRelative("target");
-        if (pTarget != null)
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                    {
-                        // Campo de solo lectura
-                        using (new EditorGUI.DisabledScope(true))
-                             {
-                    EditorGUILayout.ObjectField(GUIContent.none, pTarget.objectReferenceValue, typeof(GameObject), true);
-                             }
-                
-                         // Botón Ir (mismo patrón que antes con Actions)
-                         using (new EditorGUI.DisabledScope(pTarget.objectReferenceValue == null))
-                            {
-                                 if (GUILayout.Button("Ir", GUILayout.Width(40f)))
-                                    {
-                        var go = pTarget.objectReferenceValue as GameObject;
-                                         if (go != null)
-                                             {
-                            Selection.activeObject = go;
-                                                 if (SceneView.lastActiveSceneView != null)
-                                SceneView.lastActiveSceneView.FrameSelected();
-                                             }
-                                     }
-                            }
-                     }
-             }
+
+        // (QUITADO) — No hay "target" global; el target es por sección
+
         GUILayout.EndVertical();
     }
 
 
+
+    // === REEMPLAZAR COMPLETO ===
     void DrawDiscoverSectionsFixed(SerializedProperty pSections)
     {
-        if (pSections == null || !pSections.isArray || pSections.arraySize == 0) return;
+        if (pSections == null || !pSections.isArray || pSections.arraySize == 0)
+            return;
 
-        EditorGUILayout.Space(4);
+        GUILayout.Space(8);
         EditorGUILayout.LabelField("Secciones", EditorStyles.boldLabel);
 
         for (int i = 0; i < pSections.arraySize; i++)
@@ -587,32 +569,64 @@ public class GameObjectNotesEditor : Editor
             var pSection = pSections.GetArrayElementAtIndex(i);
             if (pSection == null) continue;
 
-            var pSecName = pSection.FindPropertyRelative("sectionName");
-            var pSecImage = pSection.FindPropertyRelative("image");
-            var pSecContent = pSection.FindPropertyRelative("sectionContent");
-            var pActions = pSection.FindPropertyRelative("actions");
+            var pName = pSection.FindPropertyRelative("sectionName");
+            var pImage = pSection.FindPropertyRelative("image");
+            var pTarget = pSection.FindPropertyRelative("target");           // <-- NUEVO
+            var pContent = pSection.FindPropertyRelative("sectionContent");
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                string secName = (pSecName != null && !string.IsNullOrWhiteSpace(pSecName.stringValue))
-                    ? pSecName.stringValue
-                    : $"Seccin {i + 1}";
-                EditorGUILayout.LabelField(secName, EditorStyles.boldLabel);
+                // Título de la sección
+                var title = (pName != null && !string.IsNullOrWhiteSpace(pName.stringValue))
+                            ? pName.stringValue
+                            : "Sección";
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
 
-                if (pSecImage != null && pSecImage.objectReferenceValue is Texture2D secTex)
+                // Imagen (opcional)
+                if (pImage != null && pImage.objectReferenceValue != null)
                 {
-                    DrawTextureWithAspect(secTex, 160f);
-                    GUILayout.Space(2);
+                    var tex = pImage.objectReferenceValue as Texture2D;
+                    if (tex != null)
+                    {
+                        float h = 160f;
+                        var r = GUILayoutUtility.GetRect(1, h, GUILayout.ExpandWidth(true));
+                        GUI.DrawTexture(r, tex, ScaleMode.ScaleToFit, true);
+                        GUILayout.Space(4);
+                    }
                 }
 
-                if (pSecContent != null && !string.IsNullOrWhiteSpace(pSecContent.stringValue))
+                // Target (debajo de la imagen) + botón "Ir"   ////  <<--- NUEVO BLOQUE
+                if (pTarget != null)
                 {
-                    EditorGUILayout.LabelField(pSecContent.stringValue, EditorStyles.wordWrappedLabel);
-                    GUILayout.Space(2);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        using (new EditorGUI.DisabledScope(true))
+                            EditorGUILayout.ObjectField(GUIContent.none, pTarget.objectReferenceValue, typeof(GameObject), true);
+
+                        using (new EditorGUI.DisabledScope(pTarget.objectReferenceValue == null))
+                        {
+                            if (GUILayout.Button("Ir", GUILayout.Width(40f)))
+                            {
+                                var go = pTarget.objectReferenceValue as GameObject;
+                                if (go != null)
+                                {
+                                    Selection.activeObject = go;
+                                    if (SceneView.lastActiveSceneView != null)
+                                        SceneView.lastActiveSceneView.FrameSelected();
+                                }
+                            }
+                        }
+                    }
                 }
 
-                DrawDiscoverActionsFixed(pActions);
+                // Contenido plano
+                if (pContent != null && !string.IsNullOrWhiteSpace(pContent.stringValue))
+                {
+                    EditorGUILayout.LabelField(pContent.stringValue, EditorStyles.label, GUILayout.MinHeight(18f));
+                }
             }
+
+            GUILayout.Space(6);
         }
     }
 
@@ -690,7 +704,8 @@ public class GameObjectNotesEditor : Editor
         return obj.name ?? "(objeto)";
     }
 
-    void DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(SerializedProperty pNote, int noteIndex)
+    bool DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(SerializedProperty pNote, int noteIndex)
+
     {
         string category = pNote.FindPropertyRelative("category").stringValue ?? "Info";
         string author = pNote.FindPropertyRelative("author").stringValue;
@@ -759,9 +774,10 @@ public class GameObjectNotesEditor : Editor
 
         // En colapsado forzamos altura compacta de una línea para el título
         float titleLineH = Mathf.Max(16f, GetStyleLineHeight(ttTitleStyle));
-        float titleH = collapsed ? Mathf.Max(titleLineH, (cache.icon != null ? ICON : 0f)) : cache.titleH;
-
-        float headerH = collapsed ? 0f : HEADER_STRIP;
+        float titleH = collapsed
+    ? Mathf.Max(titleLineH * 2f + 2f, (cache.icon != null ? ICON : 0f))
+    : cache.titleH;
+        float headerH = HEADER_STRIP;
         float padTop = collapsed ? 4f : PADDING;
         float padBot = collapsed ? 4f : PADDING;
         float padL = collapsed ? 8f : PADDING;
@@ -771,10 +787,10 @@ public class GameObjectNotesEditor : Editor
         float totalH = headerH + padTop + padBot + titleH + titleGap + effectiveBodyH;
 
         Rect outer = GUILayoutUtility.GetRect(0, totalH, GUILayout.ExpandWidth(true));
-        if (outer.width <= 1f) return;
+        if (outer.width <= 1f) return collapsed;
 
         GUI.BeginGroup(outer);
-        DrawTooltipBackground(new Rect(0, 0, outer.width, totalH), cache.bg, cache.accent, accentLeft: collapsed);
+        DrawTooltipBackground(new Rect(0, 0, outer.width, totalH), cache.bg, cache.accent, accentLeft: false);
 
         ttTitleStyle.normal.textColor = cache.preferDark ? Color.black : Color.white;
         ttBodyStyle.normal.textColor = cache.preferDark ? new Color(0.12f, 0.12f, 0.12f, 1f)
@@ -827,61 +843,26 @@ public class GameObjectNotesEditor : Editor
         // Título + Teaser en una sola línea cuando está colapsado
         if (collapsed)
         {
-            // Dibujamos el título SIN wrap y con clip
+            // Cabecera en dos líneas: <b>Título</b> \n Severidad • Área • Autor • Fecha
             bool prevWrap = ttTitleStyle.wordWrap;
             var prevClip = ttTitleStyle.clipping;
             bool prevRich = ttTitleStyle.richText;
-            ttTitleStyle.wordWrap = false;
-            ttTitleStyle.clipping = TextClipping.Clip;
-            ttTitleStyle.richText = true; // mantenemos negrita del <b>
+
+            ttTitleStyle.wordWrap = true;               // permitimos salto de línea
+            ttTitleStyle.clipping = TextClipping.Overflow;
+            ttTitleStyle.richText = true;               // mantiene el <b> del título
 
             GUI.Label(titleR, cache.titleGC, ttTitleStyle);
 
-            // Medimos el ancho real del título (texto sin tags)
-            string titlePlain = StripRichTags(cache.titleGC.text);
-            var measureTitleStyle = new GUIStyle(ttTitleStyle) { richText = false };
-            float titleW = measureTitleStyle.CalcSize(new GUIContent(titlePlain)).x;
-            titleW = Mathf.Min(titleW, titleR.width);
-
-            // Calculamos el área restante para el teaser
-            const string SEP = "           ";
-            var teaserStyle = new GUIStyle(ttBodyStyle)
-            {
-                wordWrap = false,
-                clipping = TextClipping.Clip,
-                richText = false,
-                alignment = TextAnchor.MiddleLeft
-            };
-            teaserStyle.normal.textColor = cache.preferDark ? new Color(0f, 0f, 0f, 0.70f)
-                                                            : new Color(1f, 1f, 1f, 0.75f);
-
-            float sepW = teaserStyle.CalcSize(new GUIContent(SEP)).x;
-            float remain = titleR.width - titleW - sepW;
-
-            if (remain > 40f) // si no hay espacio razonable, no pintamos teaser
-            {
-                // Construimos teaser desde el RAW (plano) y lo ellipsizamos al ancho disponible
-                string teaserPlain = BuildTeaserFromRaw(raw);
-                string teaserFit = EllipsizeToWidth(teaserStyle, teaserPlain, remain);
-
-                // Pinta separador + teaser
-                var sepR = new Rect(titleR.x + titleW, titleR.y, sepW, titleR.height);
-                var tzR = new Rect(sepR.xMax, titleR.y, remain, titleR.height);
-
-                GUI.Label(sepR, SEP, teaserStyle);
-                GUI.Label(tzR, teaserFit, teaserStyle);
-            }
-
-            // Restaurar estilo
+            // restaurar
             ttTitleStyle.wordWrap = prevWrap;
             ttTitleStyle.clipping = prevClip;
             ttTitleStyle.richText = prevRich;
         }
         else
         {
-            // Modo no colapsado: igual que antes
+            // (lo que ya tenías para no colapsado)
             GUI.Label(titleR, cache.titleGC, ttTitleStyle);
-
             Rect bodyR = new Rect(inner.x, inner.y + titleH + titleGap, inner.width, cache.bodyH);
             RenderBodyWithInlineImages(cache, bodyR);
             HandleLinksClicks(cache);
@@ -890,6 +871,7 @@ public class GameObjectNotesEditor : Editor
         }
 
         GUI.EndGroup();
+        return collapsed;
     }
     static string BuildTeaserFromRaw(string raw)
     {
