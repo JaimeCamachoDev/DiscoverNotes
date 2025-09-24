@@ -152,49 +152,75 @@ public class NotesTooltipWindow : EditorWindow
 
     void PrepareContent_PerNote()
     {
-        var sb = new StringBuilder();
-
-        if (!string.IsNullOrWhiteSpace(_noteData?.discoverName))
+        string Normalize(string value)
         {
-            sb.AppendLine(_noteData.discoverName.Trim());
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return value.Replace("\r\n", "\n").Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(_noteData?.discoverSummary))
+        string Indent(string value)
         {
-            sb.AppendLine(_noteData.discoverSummary.Trim());
-            sb.AppendLine();
+            if (string.IsNullOrEmpty(value)) return value;
+            return "  " + value.Replace("\n", "\n  ");
         }
+
+        var blocks = new List<string>();
+
+        string name = Normalize(_noteData?.discoverName);
+        if (!string.IsNullOrEmpty(name))
+            blocks.Add($"<size=14><b>{name}</b></size>");
+
+        string summary = Normalize(_noteData?.discoverSummary);
+        if (!string.IsNullOrEmpty(summary))
+            blocks.Add($"<b>Descripción</b>\n{summary}");
 
         if (_noteData?.discoverSections != null && _noteData.discoverSections.Count > 0)
         {
+            var sectionSb = new StringBuilder();
             int added = 0;
             foreach (var section in _noteData.discoverSections)
             {
                 if (section == null) continue;
-                bool hasName = !string.IsNullOrWhiteSpace(section.sectionName);
-                bool hasContent = !string.IsNullOrWhiteSpace(section.sectionContent);
-                if (!hasName && !hasContent) continue;
 
-                sb.Append("• ");
-                if (hasName) sb.Append(section.sectionName.Trim());
-                if (hasContent)
+                string secName = Normalize(section.sectionName);
+                string secContent = Normalize(section.sectionContent);
+                if (string.IsNullOrEmpty(secName) && string.IsNullOrEmpty(secContent))
+                    continue;
+
+                if (sectionSb.Length == 0)
                 {
-                    if (hasName) sb.Append(": ");
-                    sb.Append(section.sectionContent.Trim());
+                    sectionSb.AppendLine("<b>Secciones</b>");
+                    sectionSb.AppendLine();
                 }
-                sb.AppendLine();
 
+                if (!string.IsNullOrEmpty(secName))
+                {
+                    sectionSb.AppendLine($"• <b>{secName}</b>");
+                    if (!string.IsNullOrEmpty(secContent))
+                        sectionSb.AppendLine(Indent(secContent));
+                }
+                else
+                {
+                    sectionSb.AppendLine($"• {secContent}");
+                }
+
+                sectionSb.AppendLine();
                 added++;
                 if (added >= 4) break;
             }
-            if (added > 0) sb.AppendLine();
+
+            string sectionBlock = sectionSb.ToString().TrimEnd();
+            if (!string.IsNullOrEmpty(sectionBlock))
+                blocks.Add(sectionBlock);
         }
 
-        string baseNotes = _noteData?.notes ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(baseNotes))
-            sb.Append(baseNotes.Trim());
+        string baseNotes = Normalize(_noteData?.notes);
+        if (!string.IsNullOrEmpty(baseNotes))
+            blocks.Add($"<b>Notas</b>\n{baseNotes}");
 
-        string raw = sb.ToString().Trim();
+        blocks.RemoveAll(string.IsNullOrWhiteSpace);
+        string raw = string.Join("\n\n", blocks);
+        raw = raw.Trim();
         if (raw.Length > 2000) raw = raw.Substring(0, 2000) + "…";
 
         string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
