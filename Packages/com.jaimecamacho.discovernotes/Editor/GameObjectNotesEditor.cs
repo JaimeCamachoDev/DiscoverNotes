@@ -127,7 +127,7 @@ public class GameObjectNotesEditor : Editor
             }
             else
             {
-                DrawHeaderToolbar_PerNote(pNote, pMode);
+              
                 DrawFixedLikeTooltip_WithCollapse_AndRich_PerNote(pNote, i);
                 DrawDiscoverContent_Fixed(pNote);
             }

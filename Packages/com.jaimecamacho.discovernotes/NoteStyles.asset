@@ -18,32 +18,23 @@ MonoBehaviour:
   - Carlos
   - David
   - Gaspar
+  - Jaime
   categories:
   - name: Info
-    icon: {fileID: 0}
-    cardBackground: {r: 0.12, g: 0.12, b: 0.14, a: 0.3}
+    icon: {fileID: 2800000, guid: 29503919af45e8c4ab52a58d2583fc43, type: 3}
+    cardBackground: {r: 0, g: 0.24847299, b: 0.5377358, a: 0.3}
     tooltipAccentBar: {r: 0.28, g: 0.55, b: 1, a: 1}
-    tooltipBackground: {r: 0.12, g: 0.12, b: 0.14, a: 1}
-  - name: Warning
-    icon: {fileID: 0}
-    cardBackground: {r: 0.3, g: 0.3, b: 0.05, a: 0.6}
-    tooltipAccentBar: {r: 0.98, g: 0.78, b: 0.15, a: 1}
-    tooltipBackground: {r: 0.15, g: 0.13, b: 0.05, a: 1}
+    tooltipBackground: {r: 0, g: 0.048692245, b: 0.19215687, a: 1}
   - name: Error
-    icon: {fileID: 0}
-    cardBackground: {r: 0.3, g: 0.08, b: 0.08, a: 0.6}
-    tooltipAccentBar: {r: 1, g: 0.4, b: 0.4, a: 1}
-    tooltipBackground: {r: 0.16, g: 0.08, b: 0.08, a: 1}
-  - name: Todo
-    icon: {fileID: 0}
-    cardBackground: {r: 0.6, g: 0.45, b: 1, a: 0.15}
-    tooltipAccentBar: {r: 0.6, g: 0.45, b: 1, a: 1}
-    tooltipBackground: {r: 0.1, g: 0.1, b: 0.15, a: 1}
-  - name: Important
-    icon: {fileID: 0}
-    cardBackground: {r: 1, g: 1, b: 1, a: 0.3}
-    tooltipAccentBar: {r: 1, g: 1, b: 1, a: 1}
-    tooltipBackground: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+    icon: {fileID: 2800000, guid: 72a6ff496c300b44ebd1981f8cb45f16, type: 3}
+    cardBackground: {r: 0.4528302, g: 0.09611963, b: 0.09611963, a: 0.6}
+    tooltipAccentBar: {r: 0.7924528, g: 0.19063722, b: 0.19063722, a: 1}
+    tooltipBackground: {r: 0.16862746, g: 0, b: 0, a: 1}
+  - name: Warning
+    icon: {fileID: 2800000, guid: 2b091dde63c2b2648a0b19e51912c794, type: 3}
+    cardBackground: {r: 0.7830189, g: 0.7298216, b: 0.0701762, a: 0.6}
+    tooltipAccentBar: {r: 0.9245283, g: 0.90456194, b: 0.4753471, a: 1}
+    tooltipBackground: {r: 0.128, g: 0.12064368, b: 0, a: 1}
   discoverDisciplines:
   - FX
   - Audio
@@ -53,4 +44,4 @@ MonoBehaviour:
   - Systems / Code
   - Workflow / Pipeline
   - Other
-
+  - 
