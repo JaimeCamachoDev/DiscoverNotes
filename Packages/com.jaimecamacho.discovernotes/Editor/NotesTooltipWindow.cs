@@ -164,16 +164,52 @@ public class NotesTooltipWindow : EditorWindow
             return "  " + value.Replace("\n", "\n  ");
         }
 
-        var blocks = new List<string>();
+        // --- CABECERA (meta) para el título de la banda superior ---
+        string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
+        string date = string.IsNullOrEmpty(_noteData?.dateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : _noteData.dateCreated;
 
+        string discipline = _noteData != null
+            ? DiscoverCategoryUtility.GetDisplayName(_noteData.discoverCategory)
+            : DiscoverCategoryUtility.GetDisplayName(DiscoverCategory.Other);
+
+        string catName = string.IsNullOrEmpty(_noteData?.category) ? "Nota" : _noteData.category;
+        string metaCat = !string.IsNullOrEmpty(discipline) ? $"{catName} • {discipline}" : catName;
+
+        // ancho disponible teniendo en cuenta padding, pin y (si hay) icono
+        float maxTitleW = Mathf.Max(
+            50f,
+            EditorGUIUtility.currentViewWidth - PADDING * 2f - (PIN_W + PIN_GAP) - (iconTex != null ? (ICON + ICON_PAD) : 0f)
+        );
+
+        // IMPORTANTE: inicializamos titleGC para que jamás sea null
+        titleGC = new GUIContent(BuildOneLineTitle(metaCat, author, date, maxTitleW, titleStyle));
+
+
+
+
+
+
+
+        // --- NUEVO bloque para construir el cuerpo con menos separación ---
+        var bodySb = new StringBuilder();
+
+        // 1) Título (sin línea en blanco extra debajo)
         string name = Normalize(_noteData?.discoverName);
         if (!string.IsNullOrEmpty(name))
-            blocks.Add($"<size=14><b>{name}</b></size>");
+        {
+            bodySb.AppendLine("<size=14><b>" + name + "</b></size>");
+            // OJO: no añadimos AppendLine() extra aquí, así queda pegado a la descripción
+        }
 
-        string summary = Normalize(_noteData?.discoverSummary);
-        if (!string.IsNullOrEmpty(summary))
-            blocks.Add($"<b>Descripción</b>\n{summary}");
+        // 2) Descripción / notas (tu “texto libre”)
+        string baseNotes = Normalize(_noteData?.notes);
+        if (!string.IsNullOrEmpty(baseNotes))
+        {
+            bodySb.AppendLine(baseNotes);
+            bodySb.AppendLine(); // dejamos UNA línea en blanco antes de las secciones
+        }
 
+        // 3) Secciones (en bullets, máx. 4)
         if (_noteData?.discoverSections != null && _noteData.discoverSections.Count > 0)
         {
             var sectionSb = new StringBuilder();
@@ -187,65 +223,37 @@ public class NotesTooltipWindow : EditorWindow
                 if (string.IsNullOrEmpty(secName) && string.IsNullOrEmpty(secContent))
                     continue;
 
-                if (sectionSb.Length == 0)
+                // bullet con nombre en negrita; si no hay nombre, usa solo el contenido
+                sectionSb.AppendLine("• " + (string.IsNullOrEmpty(secName) ? secContent : "<b>" + secName + "</b>"));
+                if (!string.IsNullOrEmpty(secName) && !string.IsNullOrEmpty(secContent))
                 {
-                    sectionSb.AppendLine("<b>Secciones</b>");
-                    sectionSb.AppendLine();
+                    // indent del contenido debajo del nombre
+                    sectionSb.AppendLine("  " + secContent.Replace("\n", "\n  "));
                 }
-
-                if (!string.IsNullOrEmpty(secName))
-                {
-                    sectionSb.AppendLine($"• <b>{secName}</b>");
-                    if (!string.IsNullOrEmpty(secContent))
-                        sectionSb.AppendLine(Indent(secContent));
-                }
-                else
-                {
-                    sectionSb.AppendLine($"• {secContent}");
-                }
-
                 sectionSb.AppendLine();
-                added++;
-                if (added >= 4) break;
+
+                if (++added >= 4) break;
             }
 
             string sectionBlock = sectionSb.ToString().TrimEnd();
             if (!string.IsNullOrEmpty(sectionBlock))
-                blocks.Add(sectionBlock);
+                bodySb.AppendLine(sectionBlock);
         }
 
-        string baseNotes = Normalize(_noteData?.notes);
-        if (!string.IsNullOrEmpty(baseNotes))
-            blocks.Add($"<b>Notas</b>\n{baseNotes}");
-
-        blocks.RemoveAll(string.IsNullOrWhiteSpace);
-        string raw = string.Join("\n\n", blocks);
-        raw = raw.Trim();
+        // 4) Ensamblado final → bodyGC
+        string raw = bodySb.ToString().Trim();
         if (raw.Length > 2000) raw = raw.Substring(0, 2000) + "…";
-
-        string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
-        string date = string.IsNullOrEmpty(_noteData?.dateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : _noteData.dateCreated;
-        var discipline = _noteData != null
-            ? DiscoverCategoryUtility.GetDisplayName(_noteData.discoverCategory)
-            : DiscoverCategoryUtility.GetDisplayName(DiscoverCategory.Other);
-        string catName = string.IsNullOrEmpty(_noteData?.category) ? "Nota" : _noteData.category;
-        if (!string.IsNullOrEmpty(discipline))
-            catName = $"{catName} · {discipline}";
-
-        float screenW = Screen.currentResolution.width;
-        float maxTitleW = Mathf.Max(50f, screenW - SCREEN_MARGIN * 2f - PADDING * 2f - (iconTex != null ? (ICON + ICON_PAD) : 0f));
-
-        titleGC = new GUIContent(BuildOneLineTitle(catName, author, date, maxTitleW, titleStyle));
 
         _links.Clear(); _checks.Clear(); _images.Clear();
         string styled = LinkMarkup.BuildStyled(raw, _links, _checks, _images, out _indexMap);
         bodyGC = new GUIContent(styled);
 
         _imgLayout.Clear();
+        // --- FIN bloque nuevo ---
+
     }
 
-
-    string BuildOneLineTitle(string category, string author, string date, float maxW, GUIStyle st)
+        string BuildOneLineTitle(string category, string author, string date, float maxW, GUIStyle st)
     {
         string Sep = "  •  ";
         string Bold(string s) => $"<b>{s}</b>";
@@ -447,7 +455,7 @@ public class NotesTooltipWindow : EditorWindow
         GUI.color = prev;
 
         // Cuerpo: usa TODO el ancho. La cabecera ya reservó la chincheta.
-        var bodyR = new Rect(inner.x, inner.y + titleH + 4f, inner.width, inner.height - titleH - 4f);
+        var bodyR = new Rect(inner.x, inner.y + titleH + 10f, inner.width, inner.height - titleH - 10f);
 
         // === NUEVO: render segmentado con imágenes inline (izquierda) y zonas clickables correctas ===
         RenderBodyWithInlineImages(bodyR);
