@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using Unity.Android.Gradle.Manifest;
 using UnityEditor;
 using UnityEngine;
 
@@ -252,7 +253,7 @@ public static class NoteStylesProvider
             }
 
             if (string.IsNullOrEmpty(s_cachedScriptPath))
-                return "Assets/Notes/NoteStyles.asset"; // fallback
+                return "Packages/DiscoverNotes/NoteStyles.asset"; // fallback
         }
 
         var dir = Path.GetDirectoryName(s_cachedScriptPath)?.Replace("\\", "/");   // .../Core
@@ -260,7 +261,7 @@ public static class NoteStylesProvider
         if (!string.IsNullOrEmpty(parent))
             return $"{parent}/NoteStyles.asset";
 
-        return "Assets/Notes/NoteStyles.asset";
+        return "Packages/DiscoverNotes/NoteStyles.asset";
     }
 
     static void EnsureFolderExists(string folderPath)

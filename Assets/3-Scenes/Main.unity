@@ -37,7 +37,7 @@ RenderSettings:
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
-  m_Sun: {fileID: 0}
+  m_Sun: {fileID: 1357732931}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -94,7 +94,7 @@ LightmapSettings:
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
   m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
-  m_LightingSettings: {fileID: 0}
+  m_LightingSettings: {fileID: 4890085278179872738, guid: be57025c68e45ac4f936ae19d4d05969, type: 2}
 --- !u!196 &4
 NavMeshSettings:
   serializedVersion: 2
@@ -130,7 +130,6 @@ GameObject:
   - component: {fileID: 1357732932}
   - component: {fileID: 1357732931}
   - component: {fileID: 1357732930}
-  - component: {fileID: 1357732929}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -138,51 +137,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1357732929
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1357732928}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09183b8e652dbf9458a63e7f46b5d1c5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  author: Carlos
-  dateCreated: 22/09/2025
-  category: Info
-  notes: 
-  displayMode: 0
-  showInHierarchy: 1
-  notesList:
-  - author: David
-    dateCreated: 09/09/2025
-    category: Todo
-    discoverName: titulos
-    discoverCategory: 7
-    discoverImage: {fileID: 10300, guid: 0000000000000000f000000000000000, type: 0}
-    discoverSummary: 'syubtitulo '
-    discoverSections:
-    - sectionName: seccion
-      image: {fileID: 10309, guid: 0000000000000000f000000000000000, type: 0}
-      target: {fileID: 0}
-      sectionContent: 'contenido seccion
-
-'
-      actions:
-      - description: descripcion asccion
-        target: {fileID: 1409662641}
-        hint: ?=???
-    - sectionName: 
-      image: {fileID: 0}
-      target: {fileID: 0}
-      sectionContent: 
-      actions: []
-    notes: descripcion titulo
-    displayMode: 1
-    showInHierarchy: 1
 --- !u!114 &1357732930
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -322,39 +276,33 @@ MonoBehaviour:
   displayMode: 0
   showInHierarchy: 1
   notesList:
-  - author: Carlos
+  - author: Gaspar
     dateCreated: 05/09/2024
     category: Info
     discoverName: Humo
-    discoverCategory: 2
-    discoverImage: {fileID: 0}
+    discoverCategory: 5
+    discoverImage: {fileID: 10906, guid: 0000000000000000f000000000000000, type: 0}
     discoverSummary: holliiii
     discoverSections:
-    - sectionName: humo 12
-      image: {fileID: 0}
-      target: {fileID: 1357732928}
-      sectionContent: 'este humo empieza en el segundo 5 '
-      actions:
-      - description: hom 1
-        target: {fileID: 1357732928}
-        hint: asdas
-    - sectionName: humo X
-      image: {fileID: 0}
+    - sectionName: DASDA
+      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
       target: {fileID: 0}
-      sectionContent: 'este humo empieza en el segundo 5   '
-      actions:
-      - description: hom 1
-        target: {fileID: 1357732928}
-        hint: asdas
-    - sectionName: 'humo 1 '
-      image: {fileID: 0}
+      sectionContent: 
+      actions: []
+    - sectionName: DASDA
+      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
       target: {fileID: 0}
-      sectionContent: este humo empieza en el segundo 1
-      actions:
-      - description: hom 1
-        target: {fileID: 1357732928}
-        hint: asdas
-    notes: humo que deje a medias patatin patatan
+      sectionContent: 
+      actions: []
+    notes: "[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\nhOLA
+      WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
+      escribe un [link externo](https://example.com/)\n\no un enlace a la [configuraci\xF3n](GlobalObjectId_V1-3-9d91d9558e0605f469c188cd46e35fe2-11400000-0)
+      del plugin\n\nIncluye cosas \xFAtiles como:\n\n[check] (Check [color=blue](Boxes))\n\n[bold](Negrita)
+      y [italics](cursiva)\n\n[color=red](Texto)[color=magenta]( de )[color=cyan](colores)
+      [size=20] ( y tama\xF1os)\n\nEmojis e im\xE1genes \uFFFD\uFFFD\n\n[size=8](Peque\xF1as:)\n\n[link
+      top](https://example.com/)\n\n[img=15](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
+      mid](https://example.com/)\n\n[size=20](Normales o grandes:)\n\n[img](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
+      bottom](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)"
     displayMode: 1
     showInHierarchy: 1
 --- !u!4 &1409662643
