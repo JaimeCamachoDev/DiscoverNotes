@@ -18,6 +18,7 @@ public class GameObjectNotesEditor : Editor
     private GUIStyle squareIconBtn;
     private Texture2D _btnBgNormal, _btnBgHover, _btnBgActive;
     private GUIStyle cardStyle, notesAreaStyle, ttTitleStyle, ttBodyStyle;
+    private GUIStyle imageIconStyle;
     private static Texture2D solidTex;
     private static Color lastCardBg = new Color(0, 0, 0, 0);
     private bool stylesReady;
@@ -27,6 +28,8 @@ public class GameObjectNotesEditor : Editor
     const float PADDING = 10f;
     const float ICON = 16f;
     const float ICON_PAD = 6f;
+    const float HEADER_IMAGE_SIZE = 40f;
+    const float SECTION_IMAGE_SIZE = 32f;
 
     static readonly GUIContent NoteTitleContent = new GUIContent(
         "Título de la nota",
@@ -201,6 +204,16 @@ public class GameObjectNotesEditor : Editor
             squareIconBtn.active.background = _btnBgActive;
         }
 
+        if (imageIconStyle == null)
+        {
+            imageIconStyle = new GUIStyle(GUIStyle.none)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(0, 0, 0, 0)
+            };
+        }
+
         stylesReady = true;
     }
 
@@ -218,10 +231,18 @@ public class GameObjectNotesEditor : Editor
     {
         using (new EditorGUILayout.HorizontalScope())
         {
+            var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
+            var headerTex = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
+            if (headerTex != null)
+            {
+                GUILayout.Label(new GUIContent(headerTex), imageIconStyle,
+                    GUILayout.Width(HEADER_IMAGE_SIZE), GUILayout.Height(HEADER_IMAGE_SIZE));
+                GUILayout.Space(6f);
+            }
+
             string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
             if (string.IsNullOrWhiteSpace(title))
                 title = pNote.FindPropertyRelative("category")?.stringValue ?? "Nota";
-            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
 
             var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
             var discipline = pDiscipline != null
@@ -234,8 +255,13 @@ public class GameObjectNotesEditor : Editor
             var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
             var badgeStyle = EditorStyles.miniLabel;
             var badgeSize = badgeStyle.CalcSize(badgeContent);
-            GUILayout.Space(6f);
-            GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
+
+            using (new GUILayout.VerticalScope())
+            {
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                GUILayout.Space(1f);
+                GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
+            }
 
             GUILayout.FlexibleSpace();
 
@@ -294,7 +320,16 @@ public class GameObjectNotesEditor : Editor
         var pImage = pNote.FindPropertyRelative("discoverImage");
         if (pImage != null)
         {
-            EditorGUILayout.PropertyField(pImage, DiscoverImageContent);
+            EditorGUI.BeginChangeCheck();
+            var newTex = (Texture2D)EditorGUILayout.ObjectField(
+                DiscoverImageContent,
+                pImage.objectReferenceValue,
+                typeof(Texture2D),
+                false);
+            if (EditorGUI.EndChangeCheck())
+            {
+                pImage.objectReferenceValue = newTex;
+            }
         }
 
 
@@ -512,9 +547,8 @@ public class GameObjectNotesEditor : Editor
         var pImage = pNote.FindPropertyRelative("discoverImage");
         var pSections = pNote.FindPropertyRelative("discoverSections");
 
-        bool hasImage = pImage != null && pImage.objectReferenceValue != null;
         bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
-        if (!hasImage && !hasSections) return;
+        if (!hasSections) return;
 
         GUILayout.Space(6);
 
@@ -533,17 +567,6 @@ public class GameObjectNotesEditor : Editor
         GUILayout.BeginVertical(cardStyle);
 
         // (QUITADO) — No pintamos un título interno para evitar el "Humo" duplicado
-
-        // Imagen principal (opcional)
-        if (hasImage)
-        {
-            var tex = pImage.objectReferenceValue as Texture2D;
-            if (tex != null)
-            {
-                DrawTextureWithAspect(tex, 180f);
-                GUILayout.Space(4);
-            }
-        }
 
         // Secciones (cada sección ya dibuja su Target debajo de su imagen)
         DrawDiscoverSectionsFixed(pSections);
@@ -580,20 +603,19 @@ public class GameObjectNotesEditor : Editor
                 var title = (pName != null && !string.IsNullOrWhiteSpace(pName.stringValue))
                             ? pName.stringValue
                             : "Sección";
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-
-                // Imagen (opcional)
-                if (pImage != null && pImage.objectReferenceValue != null)
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    var tex = pImage.objectReferenceValue as Texture2D;
-                    if (tex != null)
+                    if (pImage != null && pImage.objectReferenceValue is Texture2D tex)
                     {
-                        float h = 160f;
-                        var r = GUILayoutUtility.GetRect(1, h, GUILayout.ExpandWidth(true));
-                        GUI.DrawTexture(r, tex, ScaleMode.ScaleToFit, true);
-                        GUILayout.Space(4);
+                        GUILayout.Label(new GUIContent(tex), imageIconStyle,
+                            GUILayout.Width(SECTION_IMAGE_SIZE), GUILayout.Height(SECTION_IMAGE_SIZE));
+                        GUILayout.Space(6f);
                     }
+
+                    EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
                 }
+
+                GUILayout.Space(2f);
 
                 // Target (debajo de la imagen) + botón "Ir"   ////  <<--- NUEVO BLOQUE
                 if (pTarget != null)
@@ -679,15 +701,6 @@ public class GameObjectNotesEditor : Editor
                 EditorGUILayout.LabelField(pHint.stringValue, EditorStyles.wordWrappedMiniLabel);
             }
         }
-    }
-
-
-    void DrawTextureWithAspect(Texture2D tex, float maxHeight)
-    {
-        if (tex == null) return;
-        float aspect = (float)tex.width / Mathf.Max(1f, tex.height);
-        Rect rect = GUILayoutUtility.GetAspectRect(aspect, GUILayout.MaxHeight(maxHeight));
-        GUI.DrawTexture(rect, tex, ScaleMode.ScaleToFit, true);
     }
 
 
