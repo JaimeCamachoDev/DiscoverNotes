@@ -62,6 +62,7 @@ public class GameObjectNotesEditor : Editor
         string _metaCat, _metaAuthor, _metaDate; // piezas en bruto para construir meta
         public float titleH, bodyH, innerWidth;
         public Texture icon;
+        public float headerIconSize;
         public bool preferDark;
 
         public LinkMarkup.VisibleIndexMap indexMap;
@@ -731,6 +732,10 @@ public class GameObjectNotesEditor : Editor
             ? NoteStylesProvider.GetDisciplineDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
             : NoteStylesProvider.GetDisciplineDisplayName(DiscoverCategory.Other);
 
+        var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
+        var headerTexture = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
+        int headerImageId = headerTexture != null ? headerTexture.GetInstanceID() : 0;
+
         string authorLabel = string.IsNullOrEmpty(author) ? "Anónimo" : author;
         string dateLabel = string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date;
         var pBody = pNote.FindPropertyRelative("notes");
@@ -746,6 +751,7 @@ public class GameObjectNotesEditor : Editor
 
         int textHash = raw.GetHashCode();
         int metaHash = (category + "|" + authorLabel + "|" + dateLabel + "|" + discipline + "|" + title).GetHashCode();
+        metaHash = unchecked(metaHash * 397) ^ headerImageId;
         float availWidth = EditorGUIUtility.currentViewWidth - 20f;
         if (availWidth <= 0f) availWidth = 400f;
 
@@ -759,7 +765,15 @@ public class GameObjectNotesEditor : Editor
             cache.bg = bg;
             cache.accent = accent;
 
-            cache.icon = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(category)?.image);
+            Texture headerIcon = headerTexture != null
+                ? (Texture)headerTexture
+                : (cat != null && cat.icon != null)
+                    ? cat.icon
+                    : (EditorIconHelper.GetCategoryIcon(category)?.image);
+            cache.icon = headerIcon;
+            cache.headerIconSize = headerIcon != null
+                ? (headerTexture != null ? HEADER_IMAGE_SIZE : ICON)
+                : 0f;
             cache.titleGC = new GUIContent($"<b>{title}</b>\n{category} • {discipline} • {authorLabel} • {dateLabel}");
 
             cache.links.Clear(); cache.checks.Clear(); cache.images.Clear();
@@ -767,10 +781,11 @@ public class GameObjectNotesEditor : Editor
             cache.bodyGC = new GUIContent(displayStyled);
 
             float innerW = availWidth - (PADDING * 2f);
-            float titleAvailW = innerW - (cache.icon != null ? (ICON + ICON_PAD) : 0f);
+            float iconBlock = cache.icon != null ? (cache.headerIconSize + ICON_PAD) : 0f;
+            float titleAvailW = innerW - iconBlock;
 
             cache.titleH = ttTitleStyle.CalcHeight(cache.titleGC, Mathf.Max(50f, titleAvailW));
-            if (cache.icon != null) cache.titleH = Mathf.Max(cache.titleH, ICON);
+            if (cache.icon != null) cache.titleH = Mathf.Max(cache.titleH, cache.headerIconSize);
 
             float textH = ttBodyStyle.CalcHeight(cache.bodyGC, innerW);
             ComputeImageLayout(cache, innerW, ttBodyStyle, out float extraH);
@@ -788,8 +803,8 @@ public class GameObjectNotesEditor : Editor
         // En colapsado forzamos altura compacta de una línea para el título
         float titleLineH = Mathf.Max(16f, GetStyleLineHeight(ttTitleStyle));
         float titleH = collapsed
-    ? Mathf.Max(titleLineH * 2f + 2f, (cache.icon != null ? ICON : 0f))
-    : cache.titleH;
+            ? Mathf.Max(titleLineH * 2f + 2f, (cache.icon != null ? cache.headerIconSize : 0f))
+            : cache.titleH;
         float headerH = HEADER_STRIP;
         float padTop = collapsed ? 4f : PADDING;
         float padBot = collapsed ? 4f : PADDING;
@@ -814,10 +829,11 @@ public class GameObjectNotesEditor : Editor
         Rect titleR = new Rect(inner.x, inner.y, inner.width, titleH);
         if (cache.icon != null)
         {
-            var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((titleH - ICON) * 0.5f), ICON, ICON);
+            float iconSize = cache.headerIconSize;
+            var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((titleH - iconSize) * 0.5f), iconSize, iconSize);
             GUI.DrawTexture(iconR, cache.icon, ScaleMode.ScaleToFit, true);
-            titleR.x += ICON + ICON_PAD;
-            titleR.width -= ICON + ICON_PAD;
+            titleR.x += iconSize + ICON_PAD;
+            titleR.width -= iconSize + ICON_PAD;
         }
 
         // Botonera (candado + colapso)
