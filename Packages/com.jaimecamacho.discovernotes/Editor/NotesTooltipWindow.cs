@@ -88,6 +88,16 @@ public class NotesTooltipWindow : EditorWindow
         if (_instance == this) _instance = null;
     }
 
+    // 🔹 NUEVO helper para cerrar la ventana activa desde fuera (p.ej., al desactivar la chincheta en el inspector)
+    public static void CloseActive()
+    {
+        if (_instance != null)
+        {
+            try { _instance.Close(); } catch { }
+            _instance = null;
+        }
+    }
+
     void EnsureStyles()
     {
         if (titleStyle != null) return;

@@ -232,7 +232,7 @@ public class GameObjectNotesEditor : Editor
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            // Imagen
+            // — Imagen (igual que antes) —
             var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
             var headerTex = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
             if (headerTex != null)
@@ -244,7 +244,8 @@ public class GameObjectNotesEditor : Editor
 
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
 
-            if (!isEdit) // 🔴 solo mostramos texto si NO está en modo edición
+            // — Título y badge SOLO si NO está en edición —
+            if (!isEdit)
             {
                 string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
                 if (string.IsNullOrWhiteSpace(title))
@@ -258,42 +259,95 @@ public class GameObjectNotesEditor : Editor
                 string severity = pNote.FindPropertyRelative("category")?.stringValue;
                 if (string.IsNullOrWhiteSpace(severity)) severity = "Info";
 
-                var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
-                var badgeStyle = EditorStyles.miniLabel;
-                var badgeSize = badgeStyle.CalcSize(badgeContent);
+                var badgeContent = new GUIContent($"{severity} • {discipline}");
 
                 using (new GUILayout.VerticalScope())
                 {
                     EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
                     GUILayout.Space(1f);
+                    var badgeStyle = EditorStyles.miniLabel;
+                    var badgeSize = badgeStyle.CalcSize(badgeContent);
                     GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
                 }
             }
 
             GUILayout.FlexibleSpace();
 
-            // 🔒 Botón candado (siempre visible)
-            var icon = GetModeLockIcon(isEdit);
-            var tip = isEdit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
-            var content = new GUIContent(icon.image, tip);
+            // ========================
+            // Botones de la derecha:
+            // 1) Ojo  2) Chincheta  3) Candado
+            // ========================
 
-            Rect r = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
-            EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+            var pShowInHierarchy = pNote.FindPropertyRelative("showInHierarchy");   // 👁️
+            var pTooltipPinned = pNote.FindPropertyRelative("tooltipPinned");     // 📌 (por nota)
 
-            if (GUI.Button(r, content, squareIconBtn))
+            // — 1) OJO —
             {
-                pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed
-                                              : (int)GameObjectNotes.DisplayMode.Edit;
-                serializedObject.ApplyModifiedProperties();
-                GUI.FocusControl(null);
-                int key = NoteCacheKey(tgt.GetInstanceID(), pMode.propertyPath);
-                s_preview.Remove(key);
-                Repaint();
+                bool val = pShowInHierarchy != null && pShowInHierarchy.boolValue;
+                var eyeIcon = EditorGUIUtility.IconContent(val ? "animationvisibilitytoggleon" : "animationvisibilitytoggleoff");
+                var r = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
+                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                if (GUI.Button(r, new GUIContent(eyeIcon.image, val ? "Ocultar de la Jerarquía (tooltips)"
+                                                                    : "Mostrar en la Jerarquía (tooltips)"),
+                               GUIStyle.none))
+                {
+                    if (pShowInHierarchy != null)
+                    {
+                        pShowInHierarchy.boolValue = !val;
+                        pNote.serializedObject.ApplyModifiedProperties();
+                        NotesTooltipWindow.CloseActive(); // por si hay uno abierto
+                    }
+                }
+            }
+
+            // — 2) CHINCHETA —
+            {
+                bool val = pTooltipPinned != null && pTooltipPinned.boolValue;
+
+                // Intentamos varios nombres de icono según skin/versión de Unity; fallback a "📌"
+                GUIContent pinIcon =
+                       EditorGUIUtility.IconContent("d_Pin") ??
+                       EditorGUIUtility.IconContent("Pin") ??
+                       EditorGUIUtility.IconContent("Pinned") ??
+                       new GUIContent("📌");
+
+                var r = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
+                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                if (GUI.Button(r, new GUIContent(pinIcon.image ?? null, val ? "Desactivar tooltip en Jerarquía"
+                                                                            : "Activar tooltip en Jerarquía"),
+                               GUIStyle.none))
+                {
+                    if (pTooltipPinned != null)
+                    {
+                        pTooltipPinned.boolValue = !val;
+                        pNote.serializedObject.ApplyModifiedProperties();
+                        // Si acabamos de desactivar, cerramos cualquier tooltip visible
+                        if (val) NotesTooltipWindow.CloseActive();
+                    }
+                }
+            }
+
+            // — 3) CANDADO (modo Edit/Fixed) —
+            {
+                bool edit = isEdit;
+                var icon = EditorGUIUtility.IconContent(edit ? "IN LockButton on" : "IN LockButton");
+                var tip = edit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
+                var r = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
+                EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+
+                if (GUI.Button(r, new GUIContent(icon.image, tip), GUIStyle.none))
+                {
+                    pMode.enumValueIndex = edit ? (int)GameObjectNotes.DisplayMode.Fixed
+                                                : (int)GameObjectNotes.DisplayMode.Edit;
+                    pNote.serializedObject.ApplyModifiedProperties();
+                    GUI.FocusControl(null);
+                    Repaint();
+                }
             }
         }
+
         GUILayout.Space(4);
     }
-
 
     GUIContent GetModeLockIcon(bool isEditNow)
     {
@@ -321,8 +375,7 @@ public class GameObjectNotesEditor : Editor
             EditorGUILayout.PropertyField(pTitle, NoteTitleContent);
         }
 
-
-        // NUEVO: imagen principal debajo del título
+        // Imagen principal debajo del título
         var pImage = pNote.FindPropertyRelative("discoverImage");
         if (pImage != null)
         {
@@ -337,7 +390,6 @@ public class GameObjectNotesEditor : Editor
                 pImage.objectReferenceValue = newTex;
             }
         }
-
 
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");

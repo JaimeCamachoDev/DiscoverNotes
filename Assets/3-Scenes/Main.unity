@@ -119,6 +119,68 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &335542498
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 335542500}
+  - component: {fileID: 335542499}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &335542499
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 335542498}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09183b8e652dbf9458a63e7f46b5d1c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  author: 
+  dateCreated: 
+  category: Info
+  notes: 
+  displayMode: 0
+  showInHierarchy: 1
+  notesList:
+  - author: Gaspar
+    dateCreated: 05/09/2024
+    category: Info
+    discoverName: GameObject
+    discoverCategory: 5
+    discoverImage: {fileID: 0}
+    discoverSummary: holliiii
+    discoverSections: []
+    notes: ss
+    displayMode: 0
+    showInHierarchy: 1
+--- !u!4 &335542500
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 335542498}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.69352865, y: -0.6393805, z: -4.294023}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1357732928
 GameObject:
   m_ObjectHideFlags: 0
@@ -279,9 +341,9 @@ MonoBehaviour:
   - author: Gaspar
     dateCreated: 05/09/2024
     category: Info
-    discoverName: Humo
+    discoverName: GameObject
     discoverCategory: 5
-    discoverImage: {fileID: 10906, guid: 0000000000000000f000000000000000, type: 0}
+    discoverImage: {fileID: 0}
     discoverSummary: holliiii
     discoverSections:
     - sectionName: DASDA
@@ -303,7 +365,7 @@ MonoBehaviour:
       top](https://example.com/)\n\n[img=15](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
       mid](https://example.com/)\n\n[size=20](Normales o grandes:)\n\n[img](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
       bottom](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)"
-    displayMode: 1
+    displayMode: 0
     showInHierarchy: 1
 --- !u!4 &1409662643
 Transform:
@@ -464,3 +526,4 @@ SceneRoots:
   - {fileID: 1790342344}
   - {fileID: 1357732932}
   - {fileID: 1409662643}
+  - {fileID: 335542500}

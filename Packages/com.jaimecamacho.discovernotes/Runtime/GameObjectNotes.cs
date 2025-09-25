@@ -22,6 +22,7 @@ public class GameObjectNotes : MonoBehaviour
 
     [Header("Mostrar tooltip en Jerarquía")]
     [SerializeField] private bool showInHierarchy = true;
+    [SerializeField] private bool tooltipPinned = false; // Controls if tooltip is shown in hierarchy (legacy / por componente)
 
     // Propiedades públicas
     public string Author => author;
@@ -29,6 +30,7 @@ public class GameObjectNotes : MonoBehaviour
     public string Category => category;
     public string NotesText => notes;
     public DisplayMode Mode => displayMode;
+    public bool TooltipPinned => tooltipPinned;
 
     // El tooltip y la vista fija aplican rich text sólo en modo Fixed
     public bool RenderRichText => displayMode == DisplayMode.Fixed;
@@ -58,9 +60,10 @@ public class GameObjectNotes : MonoBehaviour
 
         public DisplayMode displayMode = DisplayMode.Edit;
 
-        // Se podrá ocultar/editar independiente del resto (campo por nota)
+        // Visibilidad en Jerarquía por nota
         public bool showInHierarchy = true;
-
+        public bool tooltipPinned = false; // 📌 NUEVO: controla si esta nota muestra tooltip
+                                           // (ojo: además debe estar showInHierarchy=true)
         public bool HasDiscoverContent()
         {
             return discoverImage != null
@@ -103,7 +106,8 @@ public class GameObjectNotes : MonoBehaviour
                 category = string.IsNullOrEmpty(category) ? "Info" : category,
                 notes = notes ?? "",
                 displayMode = displayMode,
-                showInHierarchy = showInHierarchy
+                showInHierarchy = showInHierarchy,
+                tooltipPinned = false // por defecto desactivado en migración
             });
         }
 
@@ -182,7 +186,8 @@ public class GameObjectNotes : MonoBehaviour
             discoverSections = new List<DiscoverSection>(),
             notes = string.Empty,
             displayMode = DisplayMode.Edit,
-            showInHierarchy = true
+            showInHierarchy = true,
+            tooltipPinned = false
         };
         comp.notesList.Add(n);
 
@@ -219,7 +224,8 @@ public class GameObjectNotes : MonoBehaviour
             discoverSections = new List<DiscoverSection>(),
             notes = legacy.description,
             displayMode = DisplayMode.Fixed,
-            showInHierarchy = true
+            showInHierarchy = true,
+            tooltipPinned = false
         };
 
         if (legacy.sections != null)
@@ -262,5 +268,5 @@ public class GameObjectNotes : MonoBehaviour
         Debug.LogWarning("Importar datos de DiscoverVZ solo está disponible en el Editor.");
 #endif
     }
-    #endif
+#endif
 }
