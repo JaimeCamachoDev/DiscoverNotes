@@ -232,6 +232,7 @@ public class GameObjectNotesEditor : Editor
     {
         using (new EditorGUILayout.HorizontalScope())
         {
+            // Imagen
             var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
             var headerTex = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
             if (headerTex != null)
@@ -241,32 +242,37 @@ public class GameObjectNotesEditor : Editor
                 GUILayout.Space(6f);
             }
 
-            string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
-            if (string.IsNullOrWhiteSpace(title))
-                title = pNote.FindPropertyRelative("category")?.stringValue ?? "Nota";
+            bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
 
-            var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
-            var discipline = pDiscipline != null
-                ? NoteStylesProvider.GetDisciplineDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
-                : NoteStylesProvider.GetDisciplineDisplayName(DiscoverCategory.Other);
-
-            string severity = pNote.FindPropertyRelative("category")?.stringValue;
-            if (string.IsNullOrWhiteSpace(severity)) severity = "Info";
-
-            var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
-            var badgeStyle = EditorStyles.miniLabel;
-            var badgeSize = badgeStyle.CalcSize(badgeContent);
-
-            using (new GUILayout.VerticalScope())
+            if (!isEdit) // 🔴 solo mostramos texto si NO está en modo edición
             {
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-                GUILayout.Space(1f);
-                GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
+                string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
+                if (string.IsNullOrWhiteSpace(title))
+                    title = pNote.FindPropertyRelative("category")?.stringValue ?? "Nota";
+
+                var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
+                var discipline = pDiscipline != null
+                    ? NoteStylesProvider.GetDisciplineDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
+                    : NoteStylesProvider.GetDisciplineDisplayName(DiscoverCategory.Other);
+
+                string severity = pNote.FindPropertyRelative("category")?.stringValue;
+                if (string.IsNullOrWhiteSpace(severity)) severity = "Info";
+
+                var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
+                var badgeStyle = EditorStyles.miniLabel;
+                var badgeSize = badgeStyle.CalcSize(badgeContent);
+
+                using (new GUILayout.VerticalScope())
+                {
+                    EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                    GUILayout.Space(1f);
+                    GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
+                }
             }
 
             GUILayout.FlexibleSpace();
 
-            bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
+            // 🔒 Botón candado (siempre visible)
             var icon = GetModeLockIcon(isEdit);
             var tip = isEdit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
             var content = new GUIContent(icon.image, tip);
@@ -280,7 +286,6 @@ public class GameObjectNotesEditor : Editor
                                               : (int)GameObjectNotes.DisplayMode.Edit;
                 serializedObject.ApplyModifiedProperties();
                 GUI.FocusControl(null);
-                // Limpia caché sólo de esta nota
                 int key = NoteCacheKey(tgt.GetInstanceID(), pMode.propertyPath);
                 s_preview.Remove(key);
                 Repaint();
