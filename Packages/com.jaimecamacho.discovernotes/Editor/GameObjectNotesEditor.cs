@@ -42,9 +42,6 @@ public class GameObjectNotesEditor : Editor
         "Área",
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
-    static readonly GUIContent DateCreatedContent = new GUIContent(
-        "Fecha",
-        "Fecha de creación de la nota (formato dd/MM/yyyy).");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
     static readonly GUIContent ActionsLabelContent = new GUIContent("Acciones");
 
@@ -385,7 +382,6 @@ public class GameObjectNotesEditor : Editor
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");
         var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
-        var pDate = pNote.FindPropertyRelative("dateCreated");
 
         float rowH = Mathf.Max(EditorGUIUtility.singleLineHeight + 6f, 22f);
         Rect row = EditorGUILayout.GetControlRect(false, rowH);
@@ -401,8 +397,6 @@ public class GameObjectNotesEditor : Editor
         DrawDiscoverDisciplinePopup(disciplineRect, pDiscipline);
         EditorIconHelper.DrawIconPopupAuthor(authorRect, pAuthor, NoteStylesProvider.GetAuthors());
 
-        // Botón fecha con popup anclado al rect del control
-        EditorGUILayout.PropertyField(pDate, DateCreatedContent);
     }
 
 
@@ -692,7 +686,6 @@ public class GameObjectNotesEditor : Editor
     {
         string category = pNote.FindPropertyRelative("category").stringValue ?? "Info";
         string author = pNote.FindPropertyRelative("author").stringValue;
-        string date = pNote.FindPropertyRelative("dateCreated").stringValue;
         string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
         if (string.IsNullOrWhiteSpace(title)) title = category;
 
@@ -706,7 +699,6 @@ public class GameObjectNotesEditor : Editor
         int headerImageId = headerTexture != null ? headerTexture.GetInstanceID() : 0;
 
         string authorLabel = string.IsNullOrEmpty(author) ? "Anónimo" : author;
-        string dateLabel = string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date;
         var pBody = pNote.FindPropertyRelative("notes");
         string raw = pBody.stringValue ?? string.Empty;
         var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
@@ -721,7 +713,7 @@ public class GameObjectNotesEditor : Editor
         if (!s_preview.TryGetValue(key, out var cache)) { cache = new PreviewCache(); s_preview[key] = cache; }
 
         int textHash = raw.GetHashCode();
-        int metaHash = (category + "|" + authorLabel + "|" + dateLabel + "|" + discipline + "|" + title).GetHashCode();
+        int metaHash = (category + "|" + authorLabel + "|" + discipline + "|" + title).GetHashCode();
         metaHash = unchecked(metaHash * 397) ^ headerImageId;
         float availWidth = EditorGUIUtility.currentViewWidth - 20f;
         if (availWidth <= 0f) availWidth = 400f;
@@ -745,7 +737,7 @@ public class GameObjectNotesEditor : Editor
             cache.headerIconSize = headerIcon != null
                 ? (headerTexture != null ? HEADER_IMAGE_SIZE : ICON)
                 : 0f;
-            cache.titleGC = new GUIContent($"<b>{title}</b>\n{category} • {discipline} • {authorLabel} • {dateLabel}");
+            cache.titleGC = new GUIContent($"<b>{title}</b>\n{category} • {discipline} • {authorLabel}");
 
             cache.links.Clear(); cache.checks.Clear(); cache.images.Clear();
             string displayStyled = LinkMarkup.BuildStyled(raw, cache.links, cache.checks, cache.images, out cache.indexMap);
