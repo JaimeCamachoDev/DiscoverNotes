@@ -43,6 +43,8 @@ public static class NotesHierarchyHover
         for (int c = 0; c < comps.Length; c++)
         {
             var comp = comps[c];
+            if (comp == null) continue;
+            if (!comp.ShowInHierarchy) continue;
             var list = comp.NotesList;
             if (list == null) continue;
             for (int i = 0; i < list.Count; i++)
@@ -50,7 +52,7 @@ public static class NotesHierarchyHover
                 var n = list[i];
                 if (n == null) continue;
                 if (GameObjectNotes.IsDeleted(n)) continue; // no mostrar "borradas"
-                                                            // Por petición posterior: tooltips SIEMPRE al hover ? ignoramos showInHierarchy
+                if (!n.showInHierarchy) continue;
                 noteRefs.Add((comp, n, i));
             }
         }

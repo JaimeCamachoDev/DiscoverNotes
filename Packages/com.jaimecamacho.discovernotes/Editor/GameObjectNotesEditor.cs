@@ -22,12 +22,16 @@ public class GameObjectNotesEditor : Editor
     private static Texture2D solidTex;
     private static Color lastCardBg = new Color(0, 0, 0, 0);
     private bool stylesReady;
+    private GUIContent pinIcon;
+
+    private static readonly Color PinOnColor = new Color(1f, 0.85f, 0.1f, 1f);
+    private static readonly Color PinOffColor = new Color(0.6f, 0.6f, 0.6f, 1f);
 
     // Constantes de layout
     const float HEADER_STRIP = 4f;
     const float PADDING = 10f;
     const float ICON = 16f;
-    const float ICON_PAD = 6f;
+    const float ICON_PAD = 2f;
     const float HEADER_IMAGE_SIZE = 40f;
     const float SECTION_IMAGE_SIZE = 32f;
 
@@ -212,6 +216,14 @@ public class GameObjectNotesEditor : Editor
                 padding = new RectOffset(0, 0, 0, 0)
             };
         }
+        if (pinIcon == null || (pinIcon.image == null && string.IsNullOrEmpty(pinIcon.text)))
+        {
+            pinIcon = EditorIconHelper.GetStarIcon();
+            if (pinIcon == null || (pinIcon.image == null && string.IsNullOrEmpty(pinIcon.text)))
+            {
+                pinIcon = new GUIContent("★");
+            }
+        }
 
         stylesReady = true;
     }
@@ -241,7 +253,8 @@ public class GameObjectNotesEditor : Editor
             }
 
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
-
+            var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
+            bool showInHierarchy = pShowHierarchy == null || pShowHierarchy.boolValue;
             if (!isEdit) // 🔴 solo mostramos texto si NO está en modo edición
             {
                 string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
@@ -269,7 +282,22 @@ public class GameObjectNotesEditor : Editor
             }
 
             GUILayout.FlexibleSpace();
-
+            Rect pinRect = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(26f), GUILayout.Height(20f));
+            if (DrawHierarchyPinToggle(pinRect, showInHierarchy,
+                                       "Ocultar tooltip en la Jerarquía",
+                                       "Mostrar tooltip en la Jerarquía"))
+            {
+                bool newValue = !showInHierarchy;
+                if (pShowHierarchy != null)
+                {
+                    pShowHierarchy.boolValue = newValue;
+                    serializedObject.ApplyModifiedProperties();
+                }
+                GUI.FocusControl(null);
+                showInHierarchy = newValue;
+                Repaint();
+                EditorApplication.RepaintHierarchyWindow();
+            }
             // 🔒 Botón candado (siempre visible)
             var icon = GetModeLockIcon(isEdit);
             var tip = isEdit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
@@ -308,7 +336,22 @@ public class GameObjectNotesEditor : Editor
         }
         return EditorIconHelper.TryIcon("d_LockIcon", "LockIcon");
     }
+    bool DrawHierarchyPinToggle(Rect rect, bool isPinned, string tooltipWhenPinned, string tooltipWhenUnpinned)
+    {
+        var baseIcon = pinIcon ?? new GUIContent("★");
+        var pinContent = new GUIContent(baseIcon.image, isPinned ? tooltipWhenPinned : tooltipWhenUnpinned);
+        if (pinContent.image == null)
+        {
+            pinContent.text = string.IsNullOrEmpty(baseIcon.text) ? "★" : baseIcon.text;
+        }
 
+        EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
+        var prevColor = GUI.color;
+        GUI.color = isPinned ? PinOnColor : PinOffColor;
+        bool clicked = GUI.Button(rect, pinContent, squareIconBtn ?? GUIStyle.none);
+        GUI.color = prevColor;
+        return clicked;
+    }
     // ---------- Meta ----------
     void DrawEditableMeta_PerNote(SerializedProperty pNote)
     {
@@ -641,57 +684,6 @@ public class GameObjectNotesEditor : Editor
     }
 
 
-    void DrawDiscoverActionsFixed(SerializedProperty pActions)
-    {
-        if (pActions == null || !pActions.isArray || pActions.arraySize == 0) return;
-
-        EditorGUILayout.Space(2);
-        EditorGUILayout.LabelField(ActionsLabelContent, EditorStyles.miniBoldLabel);
-
-        for (int i = 0; i < pActions.arraySize; i++)
-        {
-            var pAction = pActions.GetArrayElementAtIndex(i);
-            if (pAction == null) continue;
-
-            var pDesc = pAction.FindPropertyRelative("description");
-            var pTarget = pAction.FindPropertyRelative("target");
-            var pHint = pAction.FindPropertyRelative("hint");
-
-            string desc = (pDesc != null && !string.IsNullOrWhiteSpace(pDesc.stringValue))
-                ? pDesc.stringValue
-                : $"Acción {i + 1}";
-            EditorGUILayout.LabelField(desc, EditorStyles.label);
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.ObjectField(GUIContent.none, pTarget?.objectReferenceValue, typeof(GameObject), true);
-                }
-
-                using (new EditorGUI.DisabledScope(pTarget == null || pTarget.objectReferenceValue == null))
-                {
-                    if (GUILayout.Button("Ir", GUILayout.Width(40f)))
-                    {
-                        var go = pTarget.objectReferenceValue as GameObject;
-                        if (go != null)
-                        {
-                            Selection.activeObject = go;
-                            if (SceneView.lastActiveSceneView != null)
-                                SceneView.lastActiveSceneView.FrameSelected();
-                        }
-                    }
-                }
-            }
-
-            if (pHint != null && !string.IsNullOrWhiteSpace(pHint.stringValue))
-            {
-                EditorGUILayout.LabelField(pHint.stringValue, EditorStyles.wordWrappedMiniLabel);
-            }
-        }
-    }
-
-
     static string GetNiceDisplayName(UnityEngine.Object obj)
     {
         if (obj is Component comp) return $"{comp.gameObject.name}.{comp.GetType().Name}";
@@ -727,6 +719,8 @@ public class GameObjectNotesEditor : Editor
         string dateLabel = string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date;
         var pBody = pNote.FindPropertyRelative("notes");
         string raw = pBody.stringValue ?? string.Empty;
+        var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
+        bool showInHierarchy = pShowHierarchy == null || pShowHierarchy.boolValue;
 
         var cat = NoteStylesProvider.FindCategory(category);
         var bg = (cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f));
@@ -827,6 +821,7 @@ public class GameObjectNotesEditor : Editor
         {
             bool isEdit = pNote.FindPropertyRelative("displayMode").enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
             const float BTN = 20f;
+            const float BTN_GAP = 6f;
             float btnX = inner.x + inner.width - BTN;
 
             var lockIcon = GetModeLockIcon(isEdit);
@@ -843,7 +838,26 @@ public class GameObjectNotesEditor : Editor
                 Repaint();
             }
 
+
+            btnX -= (BTN + BTN_GAP);
+            Rect pinR = new Rect(btnX, lockR.y, BTN, BTN);
+            if (DrawHierarchyPinToggle(pinR, showInHierarchy,
+                                       "Ocultar tooltip en la Jerarquía",
+                                       "Mostrar tooltip en la Jerarquía"))
+            {
+                bool newValue = !showInHierarchy;
+                if (pShowHierarchy != null)
+                {
+                    pShowHierarchy.boolValue = newValue;
+                    serializedObject.ApplyModifiedProperties();
+                }
+                GUI.FocusControl(null);
+                showInHierarchy = newValue;
+                Repaint();
+                EditorApplication.RepaintHierarchyWindow();
+            }
             btnX -= (BTN + 6f);
+
             var collapseIcon = EditorIconHelper.TryIcon("d_scenevis_hidden", "scenevis_hidden") ?? EditorIconHelper.TryIcon("d_Toolbar Minus");
             Rect colR = new Rect(btnX, lockR.y, BTN, BTN);
             EditorGUIUtility.AddCursorRect(colR, MouseCursor.Link);
@@ -853,7 +867,7 @@ public class GameObjectNotesEditor : Editor
                 Repaint();
             }
 
-            titleR.width -= (BTN * 2f + 12f);
+            titleR.width -= (BTN * 3f + BTN_GAP * 2f);
         }
 
         // Título + Teaser en una sola línea cuando está colapsado
@@ -889,92 +903,6 @@ public class GameObjectNotesEditor : Editor
         GUI.EndGroup();
         return collapsed;
     }
-    static string BuildTeaserFromRaw(string raw)
-    {
-        if (string.IsNullOrEmpty(raw)) return "";
-
-        // 1) Quitar imágenes: [img](...)
-        string s = Regex.Replace(raw, @"\[img\]\([^)]*\)", "", RegexOptions.IgnoreCase);
-
-        // 2) Reescritura inteligente de [token](inner)
-        //    - Etiquetas conocidas -> inner (o (inner) para tag)
-        //    - Enlace normal -> texto visible (el contenido de [ ... ])
-        s = Regex.Replace(
-            s,
-            @"\[(?<tok>[^\]]+)\]\((?<inner>[^)]*)\)",
-            new MatchEvaluator(m =>
-            {
-                string tok = m.Groups["tok"].Value;
-                string inner = m.Groups["inner"].Value;
-
-                // token puede venir como "keyword" o "keyword=param"
-                string keyword = tok;
-                int eq = keyword.IndexOf('=');
-                if (eq >= 0) keyword = keyword.Substring(0, eq).Trim();
-                keyword = keyword.Trim().ToLowerInvariant();
-
-                switch (keyword)
-                {
-                    case "bold":
-                    case "italics":
-                    case "color":
-                    case "size":
-                        // formato: mostrar solo el contenido
-                        return inner;
-                    case "tag":
-                        return "@" + inner;
-                    case "check":
-                    case "checkx":
-                        return (keyword == "check") ? "☐ " + inner : "☑ " + inner;
-
-                    default:
-                        // enlace normal: mostrar el texto visible (lo que había en [ ... ])
-                        return tok;
-                }
-            }),
-            RegexOptions.IgnoreCase
-        );
-
-        // 3) Quitar separadores tipo [hr] o líneas con ---
-        s = Regex.Replace(s, @"(\[hr\])|(^\s*-{3,}\s*$)", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-
-        // 4) Normalizar espacios/nuevas líneas a una sola línea
-        s = s.Replace("\r", " ").Replace("\n", " ");
-        s = Regex.Replace(s, @"\s{2,}", " ").Trim();
-
-        return s;
-    }
-
-
-    static string StripRichTags(string styled)
-    {
-        if (string.IsNullOrEmpty(styled)) return "";
-        // Quita tags de richtext <...>
-        string s = Regex.Replace(styled, @"<[^>]+>", "");
-        // Colapsa espacios
-        s = Regex.Replace(s, @"\s{2,}", " ").Trim();
-        return s;
-    }
-
-    static string EllipsizeToWidth(GUIStyle style, string text, float maxWidth)
-    {
-        if (string.IsNullOrEmpty(text)) return "";
-        var gc = new GUIContent(text);
-        float w = style.CalcSize(gc).x;
-        if (w <= maxWidth) return text;
-
-        const string ell = "…";
-        int lo = 0, hi = text.Length;
-        while (lo < hi)
-        {
-            int mid = (lo + hi + 1) >> 1;
-            var g = new GUIContent(text.Substring(0, mid) + ell);
-            float mw = style.CalcSize(g).x;
-            if (mw <= maxWidth) lo = mid; else hi = mid - 1;
-        }
-        return (lo <= 0) ? ell : text.Substring(0, lo) + ell;
-    }
-
 
     int NoteCacheKey(int instanceId, string propertyPath)
         => unchecked((instanceId * 397) ^ propertyPath.GetHashCode());
