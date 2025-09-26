@@ -22,10 +22,6 @@ public class GameObjectNotesEditor : Editor
     private static Texture2D solidTex;
     private static Color lastCardBg = new Color(0, 0, 0, 0);
     private bool stylesReady;
-    private GUIContent pinIcon;
-
-    private static readonly Color PinOnColor = new Color(1f, 0.85f, 0.1f, 1f);
-    private static readonly Color PinOffColor = new Color(0.6f, 0.6f, 0.6f, 1f);
 
     // Constantes de layout
     const float HEADER_STRIP = 4f;
@@ -217,15 +213,6 @@ public class GameObjectNotesEditor : Editor
             };
         }
 
-        if (pinIcon == null || (pinIcon.image == null && string.IsNullOrEmpty(pinIcon.text)))
-        {
-            pinIcon = EditorIconHelper.GetStarIcon();
-            if (pinIcon == null || (pinIcon.image == null && string.IsNullOrEmpty(pinIcon.text)))
-            {
-                pinIcon = new GUIContent("★");
-            }
-        }
-
         stylesReady = true;
     }
 
@@ -254,8 +241,6 @@ public class GameObjectNotesEditor : Editor
             }
 
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
-            var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
-            bool showInHierarchy = pShowHierarchy == null || pShowHierarchy.boolValue;
 
             if (!isEdit) // 🔴 solo mostramos texto si NO está en modo edición
             {
@@ -284,23 +269,6 @@ public class GameObjectNotesEditor : Editor
             }
 
             GUILayout.FlexibleSpace();
-
-            Rect pinRect = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
-            if (DrawHierarchyPinToggle(pinRect, showInHierarchy,
-                                       "Ocultar tooltip en la Jerarquía",
-                                       "Mostrar tooltip en la Jerarquía"))
-            {
-                bool newValue = !showInHierarchy;
-                if (pShowHierarchy != null)
-                {
-                    pShowHierarchy.boolValue = newValue;
-                    serializedObject.ApplyModifiedProperties();
-                }
-                GUI.FocusControl(null);
-                showInHierarchy = newValue;
-                Repaint();
-                EditorApplication.RepaintHierarchyWindow();
-            }
 
             // 🔒 Botón candado (siempre visible)
             var icon = GetModeLockIcon(isEdit);
@@ -339,23 +307,6 @@ public class GameObjectNotesEditor : Editor
             if (gc != null && gc.image != null) return gc;
         }
         return EditorIconHelper.TryIcon("d_LockIcon", "LockIcon");
-    }
-
-    bool DrawHierarchyPinToggle(Rect rect, bool isPinned, string tooltipWhenPinned, string tooltipWhenUnpinned)
-    {
-        var baseIcon = pinIcon ?? new GUIContent("★");
-        var pinContent = new GUIContent(baseIcon.image, isPinned ? tooltipWhenPinned : tooltipWhenUnpinned);
-        if (pinContent.image == null)
-        {
-            pinContent.text = string.IsNullOrEmpty(baseIcon.text) ? "★" : baseIcon.text;
-        }
-
-        EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
-        var prevColor = GUI.color;
-        GUI.color = isPinned ? PinOnColor : PinOffColor;
-        bool clicked = GUI.Button(rect, pinContent, squareIconBtn ?? GUIStyle.none);
-        GUI.color = prevColor;
-        return clicked;
     }
 
     // ---------- Meta ----------
@@ -776,8 +727,6 @@ public class GameObjectNotesEditor : Editor
         string dateLabel = string.IsNullOrEmpty(date) ? DateTime.Now.ToString("dd/MM/yyyy") : date;
         var pBody = pNote.FindPropertyRelative("notes");
         string raw = pBody.stringValue ?? string.Empty;
-        var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
-        bool showInHierarchy = pShowHierarchy == null || pShowHierarchy.boolValue;
 
         var cat = NoteStylesProvider.FindCategory(category);
         var bg = (cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f));
@@ -878,7 +827,6 @@ public class GameObjectNotesEditor : Editor
         {
             bool isEdit = pNote.FindPropertyRelative("displayMode").enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
             const float BTN = 20f;
-            const float BTN_GAP = 6f;
             float btnX = inner.x + inner.width - BTN;
 
             var lockIcon = GetModeLockIcon(isEdit);
@@ -895,7 +843,7 @@ public class GameObjectNotesEditor : Editor
                 Repaint();
             }
 
-            btnX -= (BTN + BTN_GAP);
+            btnX -= (BTN + 6f);
             var collapseIcon = EditorIconHelper.TryIcon("d_scenevis_hidden", "scenevis_hidden") ?? EditorIconHelper.TryIcon("d_Toolbar Minus");
             Rect colR = new Rect(btnX, lockR.y, BTN, BTN);
             EditorGUIUtility.AddCursorRect(colR, MouseCursor.Link);
@@ -905,25 +853,7 @@ public class GameObjectNotesEditor : Editor
                 Repaint();
             }
 
-            btnX -= (BTN + BTN_GAP);
-            Rect pinR = new Rect(btnX, lockR.y, BTN, BTN);
-            if (DrawHierarchyPinToggle(pinR, showInHierarchy,
-                                       "Ocultar tooltip en la Jerarquía",
-                                       "Mostrar tooltip en la Jerarquía"))
-            {
-                bool newValue = !showInHierarchy;
-                if (pShowHierarchy != null)
-                {
-                    pShowHierarchy.boolValue = newValue;
-                    serializedObject.ApplyModifiedProperties();
-                }
-                GUI.FocusControl(null);
-                showInHierarchy = newValue;
-                Repaint();
-                EditorApplication.RepaintHierarchyWindow();
-            }
-
-            titleR.width -= (BTN * 3f + BTN_GAP * 2f);
+            titleR.width -= (BTN * 2f + 12f);
         }
 
         // Título + Teaser en una sola línea cuando está colapsado
