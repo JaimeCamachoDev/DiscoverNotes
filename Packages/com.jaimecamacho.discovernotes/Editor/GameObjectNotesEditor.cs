@@ -725,7 +725,10 @@ public class GameObjectNotesEditor : Editor
         serializedObject.ApplyModifiedProperties();
         EditorUtility.SetDirty(tgt);
 
-        bool hasNotes = tgt != null && tgt.NotesList != null && tgt.NotesList.Count > 0;
+        serializedObject.Update();
+        var refreshedList = serializedObject.FindProperty("notesList");
+        bool hasNotes = refreshedList != null && refreshedList.arraySize > 0;
+
         if (!hasNotes)
         {
             var component = tgt;
