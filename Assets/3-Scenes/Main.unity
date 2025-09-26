@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &335542498
+--- !u!1 &769943670
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,22 +127,22 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 335542500}
-  - component: {fileID: 335542499}
+  - component: {fileID: 769943672}
+  - component: {fileID: 769943671}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: GameObject (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &335542499
+--- !u!114 &769943671
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 335542498}
+  m_GameObject: {fileID: 769943670}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 09183b8e652dbf9458a63e7f46b5d1c5, type: 3}
@@ -155,28 +155,27 @@ MonoBehaviour:
   displayMode: 0
   showInHierarchy: 1
   notesList:
-  - author: Carlos
-    dateCreated: 12/09/2024
-    category: Error
-    discoverName: holi
-    discoverCategory: 2
-    discoverImage: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
-    discoverSummary: holliiii
+  - author: "An\xF3nimo"
+    dateCreated: 26/09/2025
+    category: Info
+    discoverName: GameObject (1)
+    discoverCategory: 7
+    discoverImage: {fileID: 0}
+    discoverSummary: 
     discoverSections: []
-    notes: "\n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\ndk\xE0s
-      dk+asojdop\xE0sdjsopajds\n[img=10](GlobalObjectId_V1-1-29503919af45e8c4ab52a58d2583fc43-2800000-0)"
+    notes: 
     displayMode: 0
     showInHierarchy: 1
---- !u!4 &335542500
+--- !u!4 &769943672
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 335542498}
+  m_GameObject: {fileID: 769943670}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.69352865, y: -0.6393805, z: -4.294023}
+  m_LocalPosition: {x: -2.7385724, y: 2.1172042, z: -2.002401}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -343,7 +342,7 @@ MonoBehaviour:
     dateCreated: 05/09/2024
     category: Info
     discoverName: GameObject
-    discoverCategory: 5
+    discoverCategory: 4
     discoverImage: {fileID: 0}
     discoverSummary: holliiii
     discoverSections:
@@ -527,4 +526,4 @@ SceneRoots:
   - {fileID: 1790342344}
   - {fileID: 1357732932}
   - {fileID: 1409662643}
-  - {fileID: 335542500}
+  - {fileID: 769943672}
