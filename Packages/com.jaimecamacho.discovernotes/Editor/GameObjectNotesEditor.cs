@@ -43,7 +43,8 @@ public class GameObjectNotesEditor : Editor
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
-    static readonly GUIContent ActionsLabelContent = new GUIContent("Acciones");
+    static readonly GUIContent AddNoteButtonContent = new GUIContent("Añadir nota");
+    static readonly GUIContent RemoveNoteButtonContent = new GUIContent("Eliminar nota");
 
     // Edición en TextArea (plana con scrollbar)
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
@@ -99,7 +100,24 @@ public class GameObjectNotesEditor : Editor
 
         if (pList.arraySize == 0)
         {
-            EditorGUILayout.HelpBox("Sin notas. RMB en el header del componente → 'Añadir nota'.", MessageType.Info);
+            GUILayout.Space(6);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(AddNoteButtonContent, GUILayout.Width(160f)))
+                {
+                    AddNoteAtIndex(pList, 0);
+                    serializedObject.Update();
+                    pList = serializedObject.FindProperty("notesList");
+                }
+                GUILayout.FlexibleSpace();
+            }
+
+            if (pList == null || pList.arraySize == 0)
+            {
+                serializedObject.ApplyModifiedProperties();
+                return;
+            }
         }
 
         // Dibuja cada nota como una tarjeta independiente
@@ -129,7 +147,7 @@ public class GameObjectNotesEditor : Editor
                 DrawHeaderToolbar_PerNote(pNote, pMode);
                 DrawEditableMeta_PerNote(pNote);
                 DrawEditableNotes_PlainAutoHeight_PerNote(pNote, i);
-                DrawDiscoverContent_Edit(pNote);
+                DrawDiscoverContent_Edit(pNote, pList, i);
 
                 GUILayout.EndVertical();
             }
@@ -366,16 +384,8 @@ public class GameObjectNotesEditor : Editor
         var pImage = pNote.FindPropertyRelative("discoverImage");
         if (pImage != null)
         {
-            EditorGUI.BeginChangeCheck();
-            var newTex = (Texture2D)EditorGUILayout.ObjectField(
-                DiscoverImageContent,
-                pImage.objectReferenceValue,
-                typeof(Texture2D),
-                false);
-            if (EditorGUI.EndChangeCheck())
-            {
-                pImage.objectReferenceValue = newTex;
-            }
+            Rect imageRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight);
+            EditorGUI.PropertyField(imageRect, pImage, DiscoverImageContent);
         }
 
 
@@ -542,7 +552,7 @@ public class GameObjectNotesEditor : Editor
     }
 
 
-    void DrawDiscoverContent_Edit(SerializedProperty pNote)
+    void DrawDiscoverContent_Edit(SerializedProperty pNote, SerializedProperty pList, int noteIndex)
     {
         GUILayout.Space(8);
         // Quitamos el título duplicado y la imagen (la imagen ya va debajo del título).
@@ -553,6 +563,27 @@ public class GameObjectNotesEditor : Editor
                 DiscoverSectionsContent,
                 true
             );
+        }
+
+        GUILayout.Space(8);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button(RemoveNoteButtonContent, EditorStyles.miniButtonLeft, GUILayout.Width(120f)))
+            {
+                if (RemoveNoteAtIndex(pList, noteIndex))
+                    return;
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button(AddNoteButtonContent, EditorStyles.miniButtonRight, GUILayout.Width(120f)))
+            {
+                AddNoteAtIndex(pList, noteIndex + 1);
+                GUIUtility.ExitGUI();
+            }
+
+            GUILayout.FlexibleSpace();
         }
     }
 
@@ -664,6 +695,104 @@ public class GameObjectNotesEditor : Editor
             }
 
             GUILayout.Space(6);
+        }
+    }
+
+    void AddNoteAtIndex(SerializedProperty pList, int insertIndex)
+    {
+        if (pList == null) return;
+
+        insertIndex = Mathf.Clamp(insertIndex, 0, Math.Max(0, pList.arraySize));
+
+        Undo.RecordObject(tgt, "Añadir nota");
+        pList.InsertArrayElementAtIndex(insertIndex);
+
+        var pNewNote = pList.GetArrayElementAtIndex(insertIndex);
+        ResetNoteProperty(pNewNote);
+
+        serializedObject.ApplyModifiedProperties();
+        EditorUtility.SetDirty(tgt);
+    }
+
+    bool RemoveNoteAtIndex(SerializedProperty pList, int noteIndex)
+    {
+        if (pList == null || noteIndex < 0 || noteIndex >= pList.arraySize)
+            return false;
+
+        Undo.RecordObject(tgt, "Eliminar nota");
+        pList.DeleteArrayElementAtIndex(noteIndex);
+
+        serializedObject.ApplyModifiedProperties();
+        EditorUtility.SetDirty(tgt);
+
+        bool hasNotes = tgt != null && tgt.NotesList != null && tgt.NotesList.Count > 0;
+        if (!hasNotes)
+        {
+            var component = tgt;
+            EditorApplication.delayCall += () =>
+            {
+                if (component != null)
+                    Undo.DestroyObjectImmediate(component);
+            };
+            GUIUtility.ExitGUI();
+            return true;
+        }
+
+        return false;
+    }
+
+    void ResetNoteProperty(SerializedProperty pNote)
+    {
+        if (pNote == null) return;
+
+        var pAuthor = pNote.FindPropertyRelative("author");
+        var pDate = pNote.FindPropertyRelative("dateCreated");
+        var pCategory = pNote.FindPropertyRelative("category");
+        var pDiscoverName = pNote.FindPropertyRelative("discoverName");
+        var pDiscoverCategory = pNote.FindPropertyRelative("discoverCategory");
+        var pDiscoverImage = pNote.FindPropertyRelative("discoverImage");
+        var pDiscoverSummary = pNote.FindPropertyRelative("discoverSummary");
+        var pDiscoverSections = pNote.FindPropertyRelative("discoverSections");
+        var pNotes = pNote.FindPropertyRelative("notes");
+        var pDisplayMode = pNote.FindPropertyRelative("displayMode");
+        var pShowInHierarchy = pNote.FindPropertyRelative("showInHierarchy");
+
+        var authors = NoteStylesProvider.GetAuthors();
+        if (pAuthor != null)
+            pAuthor.stringValue = (authors != null && authors.Length > 0) ? authors[0] : string.Empty;
+
+        if (pDate != null)
+            pDate.stringValue = DateTime.Now.ToString("dd/MM/yyyy");
+
+        var categories = NoteStylesProvider.GetCategoryNames();
+        if (pCategory != null)
+            pCategory.stringValue = (categories != null && categories.Length > 0) ? categories[0] : "Info";
+
+        if (pDiscoverName != null)
+            pDiscoverName.stringValue = tgt != null && tgt.gameObject != null ? tgt.gameObject.name : string.Empty;
+
+        if (pDiscoverCategory != null)
+            pDiscoverCategory.enumValueIndex = (int)DiscoverCategory.Other;
+
+        if (pDiscoverImage != null)
+            pDiscoverImage.objectReferenceValue = null;
+
+        if (pDiscoverSummary != null)
+            pDiscoverSummary.stringValue = string.Empty;
+
+        if (pNotes != null)
+            pNotes.stringValue = string.Empty;
+
+        if (pDisplayMode != null)
+            pDisplayMode.enumValueIndex = (int)GameObjectNotes.DisplayMode.Edit;
+
+        if (pShowInHierarchy != null)
+            pShowInHierarchy.boolValue = true;
+
+        if (pDiscoverSections != null && pDiscoverSections.isArray)
+        {
+            for (int i = pDiscoverSections.arraySize - 1; i >= 0; i--)
+                pDiscoverSections.DeleteArrayElementAtIndex(i);
         }
     }
 
