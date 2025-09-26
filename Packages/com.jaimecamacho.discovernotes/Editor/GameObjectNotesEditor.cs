@@ -42,6 +42,9 @@ public class GameObjectNotesEditor : Editor
         "Área",
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
+    static readonly GUIContent DateCreatedContent = new GUIContent(
+        "Fecha",
+        "Fecha de creación de la nota (formato dd/MM/yyyy).");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
     static readonly GUIContent ActionsLabelContent = new GUIContent("Acciones");
 
@@ -399,20 +402,7 @@ public class GameObjectNotesEditor : Editor
         EditorIconHelper.DrawIconPopupAuthor(authorRect, pAuthor, NoteStylesProvider.GetAuthors());
 
         // Botón fecha con popup anclado al rect del control
-        Rect row2 = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4);
-        string label = string.IsNullOrEmpty(pDate.stringValue) ? DateTime.Now.ToString("dd/MM/yyyy") : pDate.stringValue;
-
-        if (GUI.Button(row2, new GUIContent(label, EditorIconHelper.GetCalendarIcon().image)))
-        {
-            DateTime initial = ParseDateOrToday(label);
-            Rect anchor = GUIUtility.GUIToScreenRect(row2);
-
-            PopupWindow.Show(anchor, new CalendarPopup(initial, picked =>
-            {
-                pDate.stringValue = picked.ToString("dd/MM/yyyy");
-                serializedObject.ApplyModifiedProperties();
-            }));
-        }
+        EditorGUILayout.PropertyField(pDate, DateCreatedContent);
     }
 
 
@@ -1346,15 +1336,6 @@ public class GameObjectNotesEditor : Editor
         pNotes.stringValue = updated;
         serializedObject.ApplyModifiedProperties();
         s_preview.Remove(tgt.GetInstanceID());
-    }
-
-
-
-    DateTime ParseDateOrToday(string s)
-    {
-        if (DateTime.TryParseExact(s, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None, out var d)) return d;
-        return DateTime.Now.Date;
     }
 }
 #endif

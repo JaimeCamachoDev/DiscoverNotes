@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Categories used to classify Discover notes. Shared between the legacy DiscoverVZ
-/// component and the new multi-note workflow inside <see cref="GameObjectNotes"/>.
+/// Categories used to classify Discover notes inside <see cref="GameObjectNotes"/>.
 /// </summary>
 public enum DiscoverCategory
 {
@@ -91,14 +90,14 @@ public class DiscoverSection
     public string sectionName;
     public Texture2D image;
 
-    // NUEVO: objeto objetivo de la sección
+    // NUEVO: objeto objetivo de la secciÃ³n
     public GameObject target;
 
     [TextArea(2, 6)]
     public string sectionContent;
 
     // Oculto: antiguo sistema de acciones (mantener temporalmente por compatibilidad)
-    [HideInInspector, Obsolete("Actions eliminado. Usa 'target' en la sección.")]
+    [HideInInspector, Obsolete("Actions eliminado. Usa 'target' en la secciÃ³n.")]
     public List<DiscoverAction> actions = new List<DiscoverAction>();
 }
 
