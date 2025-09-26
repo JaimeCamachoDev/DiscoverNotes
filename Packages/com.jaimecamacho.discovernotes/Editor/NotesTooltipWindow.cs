@@ -17,6 +17,7 @@ public class NotesTooltipWindow : EditorWindow
     const float ICON = 16f;
     const float ICON_PAD = 6f;
 
+    // Chincheta
     const float PIN_W = 20f;
     const float PIN_GAP = 4f;
     const float PIN_RESERVE = PIN_W + PIN_GAP;
@@ -27,11 +28,14 @@ public class NotesTooltipWindow : EditorWindow
     [SerializeField] bool _pinned;
     public bool IsPinned => _pinned;
 
+    GUIContent _starIcon;
+
     GameObjectNotes _owner;
     int _noteIndex = -1;
     GameObjectNotes.NoteData _noteData;
 
     Texture iconTex;
+    GameObjectNotes data;
     GUIContent titleGC, bodyGC;
     float boxW, boxH;
     Color accent, bg;
@@ -44,6 +48,7 @@ public class NotesTooltipWindow : EditorWindow
     bool _sideLocked = false;
     bool _sidePlaceRight = true;
 
+    // Spans para interacción (interpretados al render)
     readonly List<LinkMarkup.LinkSpan> _links = new List<LinkMarkup.LinkSpan>();
     readonly List<LinkMarkup.ChecklistSpan> _checks = new List<LinkMarkup.ChecklistSpan>();
     readonly List<LinkMarkup.ImageSpan> _images = new List<LinkMarkup.ImageSpan>();
@@ -51,11 +56,16 @@ public class NotesTooltipWindow : EditorWindow
 
     List<(LinkMarkup.ImageSpan img, Texture2D tex, Rect uv, float extraBefore, float width, float height, Rect drawRect)> _imgLayout
         = new List<(LinkMarkup.ImageSpan, Texture2D, Rect, float, float, float, Rect)>();
-
+    // --- NUEVO: clamp por pantalla que contiene el anchor ---
     Rect _clampRect;
+
+
+    // Reemplaza el uso de System.Windows.Forms por una alternativa compatible con Unity Editor.
+    // Sustituye el método GetClampRectForAnchor por una versión que solo usa APIs de Unity.
 
     static Rect GetClampRectForAnchor(Rect anchorScreenRect, float margin)
     {
+        // Fallback: rect de la ventana principal del Editor
         var main = EditorGUIUtility.GetMainWindowPosition();
         return new Rect(main.x + margin, main.y + margin, main.width - margin * 2f, main.height - margin * 2f);
     }
@@ -67,23 +77,42 @@ public class NotesTooltipWindow : EditorWindow
         return w;
     }
 
-    void OnEnable() { _instance = this; }
-    void OnDisable() { if (_instance == this) _instance = null; }
-
-    public static void CloseActive()
+    void OnEnable()
     {
-        if (_instance != null) { try { _instance.Close(); } catch { } _instance = null; }
+        _instance = this;
+        _starIcon = EditorIconHelper.GetStarIcon();
+    }
+
+    void OnDisable()
+    {
+        if (_instance == this) _instance = null;
     }
 
     void EnsureStyles()
     {
         if (titleStyle != null) return;
         titleStyle = new GUIStyle(EditorStyles.boldLabel)
-        { richText = true, wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.MiddleLeft, fontSize = 13, normal = { textColor = Color.white } };
+        {
+            richText = true,
+            wordWrap = false,
+            clipping = TextClipping.Clip,
+            alignment = TextAnchor.MiddleLeft,
+            fontSize = 13,
+            normal = { textColor = Color.white }
+        };
         bodyStyle = new GUIStyle(EditorStyles.label)
-        { richText = true, wordWrap = true, fontSize = 12, normal = { textColor = new Color(0.95f, 0.95f, 0.97f, 1f) } };
+        {
+            richText = true,
+            wordWrap = true,
+            fontSize = 12,
+            normal = { textColor = new Color(0.95f, 0.95f, 0.97f, 1f) }
+        };
     }
 
+    /// <summary>
+    /// Muestra el tooltip para una nota. El texto subyacente SIEMPRE es plano;
+    /// aquí se interpreta (links, checklists, imágenes) SOLO al render.
+    /// </summary>
     public void ShowFor(GameObjectNotes owner, GameObjectNotes.NoteData note, int noteIndex, Rect anchorScreenRect)
     {
         bool targetChanged = _currentTargetId != owner.GetInstanceID() || _noteIndex != noteIndex;
@@ -98,16 +127,19 @@ public class NotesTooltipWindow : EditorWindow
         accent = cat != null ? cat.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f);
         bg = cat != null ? cat.tooltipBackground : new Color(0.12f, 0.12f, 0.14f, 0.985f);
         bg.a = 1f;
+
         iconTex = (cat != null && cat.icon != null) ? cat.icon : (EditorIconHelper.GetCategoryIcon(_noteData.category)?.image);
 
         PrepareContent_PerNote();
-        CalculateSize();
+        CalculateSize(); // (ver siguiente punto: ahora no usará Screen.currentResolution)
 
         _clampRect = GetClampRectForAnchor(anchorScreenRect, SCREEN_MARGIN);
+
+        // Lado preferido en función del monitor del anchor
         bool computedPlaceRight = (anchorScreenRect.xMax + ANCHOR_GAP + boxW) <= (_clampRect.xMax);
         if (!_sideLocked) { _sidePlaceRight = computedPlaceRight; _sideLocked = true; }
 
-        PositionWindow(anchorScreenRect, _sidePlaceRight);
+        PositionWindow(anchorScreenRect, _sidePlaceRight); // (ver siguiente punto)
 
         if (!hasFocus) ShowPopup();
         Repaint();
@@ -116,6 +148,7 @@ public class NotesTooltipWindow : EditorWindow
         lastMouseOverTS = lastAnchorHoverTS;
         wantsMouseMove = true;
     }
+
 
     void PrepareContent_PerNote()
     {
@@ -376,6 +409,7 @@ public class NotesTooltipWindow : EditorWindow
 
     void OnGUI()
     {
+        // Cerrar si se hace click fuera
         if (Event.current.rawType == EventType.MouseDown && EditorWindow.mouseOverWindow != this)
         {
             GUIUtility.hotControl = 0;
@@ -385,6 +419,7 @@ public class NotesTooltipWindow : EditorWindow
         }
 
         EnsureStyles();
+
         TooltipRenderer.DrawBackground(position, bg, accent);
 
         bool preferDarkText = (0.2126f * bg.r + 0.7152f * bg.g + 0.0722f * bg.b) > 0.5f;
@@ -394,7 +429,7 @@ public class NotesTooltipWindow : EditorWindow
 
         var inner = new Rect(PADDING, PADDING + HEADER_STRIP, position.width - PADDING * 2f, position.height - PADDING * 2f - HEADER_STRIP);
 
-        // Título + chincheta
+        // Título (con chincheta)
         Vector2 ts = titleStyle.CalcSize(titleGC);
         float titleH = Mathf.Max(ts.y, ICON);
         Rect titleR = new Rect(inner.x, inner.y, inner.width, titleH);
@@ -403,7 +438,7 @@ public class NotesTooltipWindow : EditorWindow
         Rect pinRect = new Rect(titleR.xMax - PIN_W, titleR.y + Mathf.Floor((titleH - PIN_W) * 0.5f), PIN_W, PIN_W);
         titleR.width -= PIN_RESERVE;
 
-        // Icono de categoría
+        // Icono
         if (iconTex != null)
         {
             var iconR = new Rect(titleR.x, titleR.y + Mathf.Floor((titleH - ICON) * 0.5f), ICON, ICON);
@@ -414,13 +449,17 @@ public class NotesTooltipWindow : EditorWindow
 
         GUI.Label(titleR, titleGC, titleStyle);
 
-        // 📌 botón pin (icono cambia según _pinned)
-        var pinIcon = EditorIconHelper.GetPinIcon(_pinned);
-        if (GUI.Button(pinRect, pinIcon, GUIStyle.none)) { _pinned = !_pinned; Repaint(); }
+        var prev = GUI.color;
+        GUI.color = _pinned ? new Color(1f, 0.85f, 0.1f, 1f) : new Color(0.6f, 0.6f, 0.6f, 1f);
+        if (GUI.Button(pinRect, _starIcon ?? new GUIContent("★"), GUIStyle.none)) { _pinned = !_pinned; Repaint(); }
+        GUI.color = prev;
 
-        // Cuerpo
+        // Cuerpo: usa TODO el ancho. La cabecera ya reservó la chincheta.
         var bodyR = new Rect(inner.x, inner.y + titleH + 10f, inner.width, inner.height - titleH - 10f);
+
+        // === NUEVO: render segmentado con imágenes inline (izquierda) y zonas clickables correctas ===
         RenderBodyWithInlineImages(bodyR);
+
         HandleLinksClicks();
         HandleChecklistClicks(bodyR);
         HandleImageClicks();
@@ -428,6 +467,7 @@ public class NotesTooltipWindow : EditorWindow
         if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
             Close();
     }
+
     void RenderBodyWithInlineImages(Rect bodyR)
     {
         foreach (var l in _links) l.hitRects.Clear();

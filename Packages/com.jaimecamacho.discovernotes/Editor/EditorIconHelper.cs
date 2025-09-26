@@ -1,65 +1,146 @@
-Ôªø#if UNITY_EDITOR
-using System;                 // ‚Üê para Array.IndexOf
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
+using System;
 
 public static class EditorIconHelper
 {
+    // Dentro de EditorIconHelper (mismo archivo)
     static Texture2D _pinOnTex, _pinOffTex;
+    // EditorIconHelper.cs
+    static GUIContent _pinOnGc, _pinOffGc;
 
-    // Devuelve el primer icono existente entre varios nombres (o null)
-    public static GUIContent TryIcon(params string[] names)
+    public static GUIContent GetStarIcon()
     {
-        if (names == null) return null;
+        // Intenta varios nombres icÛnicos; algunos devuelven GUIContent null en ciertas versiones/skins.
+        var names = new[] { "Pin", "Pinned", "LockIcon", "SceneViewOrtho", "InspectorLock", "Favorite Icon" };
+
         foreach (var n in names)
         {
-            if (string.IsNullOrEmpty(n)) continue;
-            var gc = EditorGUIUtility.IconContent(n);
-            if (gc != null && gc.image != null) return gc;
+            try
+            {
+                var gc = EditorGUIUtility.IconContent(n);
+                if (gc != null && (gc.image != null || !string.IsNullOrEmpty(gc.text)))
+                    return gc; // v·lido
+            }
+            catch { /* ignorar */ }
+        }
+
+        // ⁄ltimo fallback SIEMPRE v·lido
+        return new GUIContent("?");
+    }
+
+
+    public static void GetPinIcons(out GUIContent pinOn, out GUIContent pinOff)
+    {
+        // Icono base de estrella (puede variar de nombre seg˙n la skin/versiÛn).
+        var star = TryIcon("Favorite", "d_Favorite", "Favorite Icon", "d_Favorite Icon");
+        if (star == null)
+        {
+            // Fallback a un simple "?" en caso extremo
+            pinOn = new GUIContent("?");
+            pinOff = new GUIContent("?");
+            return;
+        }
+
+        // Clonamos el mismo texture dos veces con distintos colores.
+        var tex = star.image as Texture2D;
+        if (tex == null)
+        {
+            pinOn = new GUIContent("?");
+            pinOff = new GUIContent("?");
+            return;
+        }
+
+        // Creamos dos copias tintadas
+        var yellow = TintTexture(tex, new Color(1f, 0.85f, 0.1f, 1f));
+        var gray = TintTexture(tex, new Color(0.6f, 0.6f, 0.6f, 1f));
+
+        pinOn = new GUIContent(yellow, "Tooltip fijado");
+        pinOff = new GUIContent(gray, "Fijar tooltip");
+    }
+
+    /// <summary> Crea una copia tintada de una textura. </summary>
+    static Texture2D TintTexture(Texture2D src, Color tint)
+    {
+        var tex = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false)
+        {
+            hideFlags = HideFlags.HideAndDontSave,
+            filterMode = src.filterMode,
+            wrapMode = src.wrapMode
+        };
+        var pixels = src.GetPixels32();
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            var p = pixels[i];
+            // multiplicamos por el tinte manteniendo alpha
+            pixels[i] = new Color(
+                p.r / 255f * tint.r,
+                p.g / 255f * tint.g,
+                p.b / 255f * tint.b,
+                p.a / 255f * tint.a
+            );
+        }
+        tex.SetPixels32(pixels);
+        tex.Apply(false, false);
+        return tex;
+    }
+
+
+    // Puedes dejar este TryIcon tal cual lo tengas (params string[] names)
+    public static GUIContent TryIcon(params string[] names)
+    {
+        foreach (var n in names)
+        {
+            var tex = EditorGUIUtility.FindTexture(n);
+            if (tex != null) return new GUIContent(tex);
         }
         return null;
     }
 
-    // üëÅ Ojo con fallback
-    public static GUIContent GetEyeIcon(bool on)
+    // Igual que te pasÈ antes: generamos dos pins de distinto color
+    static Texture2D MakePinTex(bool on)
     {
-        var gc = EditorGUIUtility.IconContent(on ? "animationvisibilitytoggleon" : "animationvisibilitytoggleoff");
-        if (gc == null || gc.image == null) return new GUIContent(on ? "üëÅ" : "üö´", on ? "Visible" : "Oculto");
-        return gc;
+        var t = new Texture2D(16, 16, TextureFormat.RGBA32, false)
+        {
+            hideFlags = HideFlags.HideAndDontSave,
+            filterMode = FilterMode.Point,
+            wrapMode = TextureWrapMode.Clamp
+        };
+        var bg = new Color32(0, 0, 0, 0);
+        var head = on ? new Color32(220, 80, 80, 255) : new Color32(140, 140, 140, 255);
+        var body = on ? new Color32(240, 240, 240, 255) : new Color32(180, 180, 180, 255);
+
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+                t.SetPixel(x, y, bg);
+
+        // cabecita (disco)
+        for (int y = 4; y <= 7; y++)
+            for (int x = 7; x <= 10; x++)
+                if ((x - 8.5f) * (x - 8.5f) + (y - 5.5f) * (y - 5.5f) <= 3.2f) t.SetPixel(x, y, head);
+
+        // cuerpo diagonal
+        t.SetPixel(8, 8, body);
+        t.SetPixel(9, 9, body);
+        t.SetPixel(10, 10, body);
+        t.SetPixel(11, 11, body);
+
+        t.Apply(false, false);
+        return t;
     }
 
-    // üìå Chincheta con varios intentos y fallback (textura o emoji)
-    public static GUIContent GetPinIcon(bool on)
-    {
-        // Intentos con nombres de iconos internos de Unity
-        var gc = TryIcon("d_Pin", "Pin", "Pinned");
-        if (gc != null && gc.image != null)
-            return new GUIContent(gc.image, on ? "Tooltip activado" : "Activar tooltip");
-
-        // Fallback: textura generada
-        if (_pinOnTex == null) _pinOnTex = MakePinTex(true);
-        if (_pinOffTex == null) _pinOffTex = MakePinTex(false);
-        var tex = on ? _pinOnTex : _pinOffTex;
-        if (tex != null)
-            return new GUIContent(tex, on ? "Tooltip activado" : "Activar tooltip");
-
-        // √öltimo recurso: emoji
-        return new GUIContent("üìå", on ? "Tooltip activado" : "Activar tooltip");
-    }
-
-    // üîí Candado robusto
-    public static GUIContent GetLockIcon(bool isEditNow)
-    {
-        var gc = EditorGUIUtility.IconContent(isEditNow ? "IN LockButton on" : "IN LockButton")
-                 ?? TryIcon(isEditNow ? "d_LockIcon-On" : "d_LockIcon");
-        return gc ?? new GUIContent(isEditNow ? "üîì" : "üîí");
-    }
-
-    // Calendario (icono estable con fallback)
     public static GUIContent GetCalendarIcon()
     {
-        var gc = TryIcon("d_UnityEditor.InspectorWindow", "UnityEditor.InspectorWindow", "d_Folder Icon", "Folder Icon");
+        // Intenta algunos nombres "muy estables" (no necesariamente calendario,
+        // pero evitan logs y suelen existir). Si no, usa fallback dibujado.
+        var gc = TryIcon(
+            "d_UnityEditor.InspectorWindow", // casi siempre disponible
+            "UnityEditor.InspectorWindow",
+            "d_Folder Icon", "Folder Icon"   // como plan B
+        );
         if (gc != null && gc.image != null) return gc;
+
         return GetCalendarFallback();
     }
 
@@ -68,30 +149,48 @@ public static class EditorIconHelper
     static GUIContent GetCalendarFallback()
     {
         if (_calendarFallback != null) return _calendarFallback;
+
         if (_calendarTex == null)
         {
+            // PequeÒo icono 16x16 tipo calendario (cabecera roja + cuerpo gris)
             _calendarTex = new Texture2D(16, 16, TextureFormat.RGBA32, false)
-            { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
             for (int y = 0; y < 16; y++)
+            {
                 for (int x = 0; x < 16; x++)
                 {
                     bool border = x == 0 || y == 0 || x == 15 || y == 15;
-                    Color c = (y < 4) ? (border ? new Color32(160, 40, 40, 255) : new Color32(200, 60, 60, 255))
-                                      : (border ? new Color32(70, 70, 70, 255) : new Color32(95, 95, 95, 255));
+                    Color c;
+                    if (y < 4) // cabecera
+                        c = border ? new Color32(160, 40, 40, 255) : new Color32(200, 60, 60, 255);
+                    else
+                        c = border ? new Color32(70, 70, 70, 255) : new Color32(95, 95, 95, 255);
                     _calendarTex.SetPixel(x, y, c);
                 }
+            }
+            // ìanillasî
             _calendarTex.SetPixel(4, 13, Color.white);
             _calendarTex.SetPixel(11, 13, Color.white);
+
             _calendarTex.Apply(false, false);
         }
+
         _calendarFallback = new GUIContent(_calendarTex);
         return _calendarFallback;
     }
 
+
     public static GUIContent GetCategoryIcon(string categoryName)
     {
         var cat = NoteStylesProvider.FindCategory(categoryName);
-        if (cat != null && cat.icon != null) return new GUIContent(cat.icon);
+        if (cat != null && cat.icon != null)
+            return new GUIContent(cat.icon);
+        // fallback genÈrico
         return TryIcon("FilterByType");
     }
 
@@ -101,13 +200,15 @@ public static class EditorIconHelper
         Rect iconRect = new Rect(r.x, r.y + 1, iconW, EditorGUIUtility.singleLineHeight);
         Rect popupRect = new Rect(iconRect.xMax + 4, r.y, r.width - iconW - 4, EditorGUIUtility.singleLineHeight);
 
-        var a = EditorGUIUtility.IconContent("d_Avatar Icon") ?? EditorGUIUtility.IconContent("Avatar Icon")
-                ?? EditorGUIUtility.IconContent("d_UnityEditor.InspectorWindow");
+        // Avatar
+        var a = EditorGUIUtility.IconContent("d_Avatar Icon");
+        if (a == null || a.image == null) a = EditorGUIUtility.IconContent("Avatar Icon");
+        if (a == null || a.image == null) a = EditorGUIUtility.IconContent("d_UnityEditor.InspectorWindow");
         GUI.Label(iconRect, a);
 
         if (authors == null || authors.Length == 0)
         {
-            pAuthor.stringValue = EditorGUI.TextField(popupRect, pAuthor.stringValue);
+            pAuthor.stringValue = EditorGUI.TextField(popupRect, pAuthor.stringValue); // fallback
             return;
         }
 
@@ -124,11 +225,12 @@ public static class EditorIconHelper
         Rect iconRect = new Rect(r.x, r.y + 1, iconW, EditorGUIUtility.singleLineHeight);
         Rect popupRect = new Rect(iconRect.xMax + 4, r.y, r.width - iconW - 4, EditorGUIUtility.singleLineHeight);
 
+        // Icono de categorÌa
         GUI.Label(iconRect, GetCategoryIcon(pCategory.stringValue));
 
         if (categories == null || categories.Length == 0)
         {
-            pCategory.stringValue = EditorGUI.TextField(popupRect, pCategory.stringValue);
+            pCategory.stringValue = EditorGUI.TextField(popupRect, pCategory.stringValue); // fallback
             return;
         }
 
@@ -137,33 +239,6 @@ public static class EditorIconHelper
 
         int newIdx = EditorGUI.Popup(popupRect, idx, categories);
         if (newIdx != idx) pCategory.stringValue = categories[newIdx];
-    }
-
-    // ‚Äî util para dibujar la pin si no hay iconos ‚Äî
-    static Texture2D MakePinTex(bool on)
-    {
-        var t = new Texture2D(16, 16, TextureFormat.RGBA32, false)
-        { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
-
-        var bg = new Color32(0, 0, 0, 0);
-        var head = on ? new Color32(220, 80, 80, 255) : new Color32(140, 140, 140, 255);
-        var body = on ? new Color32(240, 240, 240, 255) : new Color32(180, 180, 180, 255);
-
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
-                t.SetPixel(x, y, bg);
-
-        for (int y = 4; y <= 7; y++)
-            for (int x = 7; x <= 10; x++)
-                if ((x - 8.5f) * (x - 8.5f) + (y - 5.5f) * (y - 5.5f) <= 3.2f) t.SetPixel(x, y, head);
-
-        t.SetPixel(8, 8, body);
-        t.SetPixel(9, 9, body);
-        t.SetPixel(10, 10, body);
-        t.SetPixel(11, 11, body);
-
-        t.Apply(false, false);
-        return t;
     }
 }
 #endif

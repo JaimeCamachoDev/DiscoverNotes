@@ -1,4 +1,4 @@
-ï»¿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -28,7 +28,7 @@ public static class NotesHierarchyHover
 
         if (!fullRowRect.Contains(e.mousePosition))
         {
-            // No cerramos aquÃ­ para respetar chinchetas (CloseAll lo hace en otros hooks)
+            // No cerramos aquí para respetar chinchetas (CloseAll lo hace en otros hooks)
             return;
         }
 
@@ -36,9 +36,9 @@ public static class NotesHierarchyHover
         if (go == null) return;
 
         var comps = go.GetComponents<GameObjectNotes>();
-        if (comps == null || comps.Length == 0) { CloseAll(true); return; }
+        if (comps == null || comps.Length == 0) return;
 
-        // ReÃºne todas las notas vivas (no "borradas" = Fixed + vacÃ­o)
+        // Reúne todas las notas vivas (no "borradas" = Fixed + vacío)
         var noteRefs = new List<(GameObjectNotes owner, GameObjectNotes.NoteData note, int noteIndex)>();
         for (int c = 0; c < comps.Length; c++)
         {
@@ -49,20 +49,14 @@ public static class NotesHierarchyHover
             {
                 var n = list[i];
                 if (n == null) continue;
-                if (GameObjectNotes.IsDeleted(n)) continue;
-
-                // âœ… Filtros de visibilidad: ðŸ‘ï¸ y ðŸ“Œ deben estar activos
-                if (!n.showInHierarchy) continue;
-                if (!n.tooltipPinned) continue;
-
+                if (GameObjectNotes.IsDeleted(n)) continue; // no mostrar "borradas"
+                                                            // Por petición posterior: tooltips SIEMPRE al hover ? ignoramos showInHierarchy
                 noteRefs.Add((comp, n, i));
             }
         }
+        if (noteRefs.Count == 0) { return; }
 
-        // Si no hay notas elegibles, cerramos tooltips no pineados y salimos
-        if (noteRefs.Count == 0) { CloseAll(true); return; }
-
-        // Ancla = Ã¡rea del nombre (corrigiendo indent)
+        // Ancla = área del nombre (corrigiendo indent)
         var anchorLocalRect = selectionRect;
         Vector2 topLeft = GUIUtility.GUIToScreenPoint(anchorLocalRect.position);
         var baseAnchor = new Rect(topLeft.x, topLeft.y, anchorLocalRect.width, anchorLocalRect.height);

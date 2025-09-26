@@ -227,8 +227,7 @@ public class GameObjectNotesEditor : Editor
         return t;
     }
 
-    // … cabecera y resto del archivo idénticos a tu versión …
-
+    // ---------- Header ----------
     void DrawHeaderToolbar_PerNote(SerializedProperty pNote, SerializedProperty pMode)
     {
         using (new EditorGUILayout.HorizontalScope())
@@ -242,64 +241,51 @@ public class GameObjectNotesEditor : Editor
                 GUILayout.Space(6f);
             }
 
-            bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
+            string title = pNote.FindPropertyRelative("discoverName")?.stringValue;
+            if (string.IsNullOrWhiteSpace(title))
+                title = pNote.FindPropertyRelative("category")?.stringValue ?? "Nota";
 
-            // --- Botonera derecha ---
-            var pShowInHierarchy = pNote.FindPropertyRelative("showInHierarchy"); // 👁
-            var pTooltipPinned = pNote.FindPropertyRelative("tooltipPinned");   // 📌
+            var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
+            var discipline = pDiscipline != null
+                ? NoteStylesProvider.GetDisciplineDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
+                : NoteStylesProvider.GetDisciplineDisplayName(DiscoverCategory.Other);
 
+            string severity = pNote.FindPropertyRelative("category")?.stringValue;
+            if (string.IsNullOrWhiteSpace(severity)) severity = "Info";
 
-            // Título + badge SOLO en Fixed
-            if (!isEdit) // Solo en modo FIXED
+            var badgeContent = new GUIContent($"{severity} • {discipline}", DiscoverDisciplineContent.tooltip);
+            var badgeStyle = EditorStyles.miniLabel;
+            var badgeSize = badgeStyle.CalcSize(badgeContent);
+
+            using (new GUILayout.VerticalScope())
             {
-                // 👁 Ojo
-                bool vEye = pShowInHierarchy != null && pShowInHierarchy.boolValue;
-                var eye = EditorIconHelper.GetEyeIcon(vEye);
-                var r1 = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
-                EditorGUIUtility.AddCursorRect(r1, MouseCursor.Link);
-                if (GUI.Button(r1, eye, squareIconBtn))
-                {
-                    if (pShowInHierarchy != null)
-                    {
-                        pShowInHierarchy.boolValue = !vEye;
-                        pNote.serializedObject.ApplyModifiedProperties();
-                        if (!pShowInHierarchy.boolValue) NotesTooltipWindow.CloseActive();
-                    }
-                }
-
-                // 📌 Chincheta (VA ENTRE EL OJO Y EL CANDADO)
-                bool vPin = pTooltipPinned != null && pTooltipPinned.boolValue;
-                var pin = EditorIconHelper.GetPinIcon(vPin);
-                var r2 = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
-                EditorGUIUtility.AddCursorRect(r2, MouseCursor.Link);
-                if (GUI.Button(r2, pin, squareIconBtn))
-                {
-                    if (pTooltipPinned != null)
-                    {
-                        pTooltipPinned.boolValue = !vPin;
-                        pNote.serializedObject.ApplyModifiedProperties();
-                        if (!pTooltipPinned.boolValue) NotesTooltipWindow.CloseActive();
-                    }
-                }
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                GUILayout.Space(1f);
+                GUILayout.Label(badgeContent, badgeStyle, GUILayout.Width(badgeSize.x + 4f));
             }
 
-            // 🔒 Candado (siempre)
+            GUILayout.FlexibleSpace();
+
+            bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
+            var icon = GetModeLockIcon(isEdit);
+            var tip = isEdit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
+            var content = new GUIContent(icon.image, tip);
+
+            Rect r = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
+            EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+
+            if (GUI.Button(r, content, squareIconBtn))
             {
-                var icon = EditorIconHelper.GetLockIcon(isEdit);
-                var tip = isEdit ? "Fijar (cerrar candado)" : "Editar (abrir candado)";
-                var r3 = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f));
-                EditorGUIUtility.AddCursorRect(r3, MouseCursor.Link);
-                if (GUI.Button(r3, new GUIContent(icon.image, tip), squareIconBtn))
-                {
-                    pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed
-                                                  : (int)GameObjectNotes.DisplayMode.Edit;
-                    pNote.serializedObject.ApplyModifiedProperties();
-                    GUI.FocusControl(null);
-                    Repaint();
-                }
+                pMode.enumValueIndex = isEdit ? (int)GameObjectNotes.DisplayMode.Fixed
+                                              : (int)GameObjectNotes.DisplayMode.Edit;
+                serializedObject.ApplyModifiedProperties();
+                GUI.FocusControl(null);
+                // Limpia caché sólo de esta nota
+                int key = NoteCacheKey(tgt.GetInstanceID(), pMode.propertyPath);
+                s_preview.Remove(key);
+                Repaint();
             }
         }
-
         GUILayout.Space(4);
     }
 
@@ -330,7 +316,8 @@ public class GameObjectNotesEditor : Editor
             EditorGUILayout.PropertyField(pTitle, NoteTitleContent);
         }
 
-        // Imagen principal debajo del título
+
+        // NUEVO: imagen principal debajo del título
         var pImage = pNote.FindPropertyRelative("discoverImage");
         if (pImage != null)
         {
@@ -345,6 +332,7 @@ public class GameObjectNotesEditor : Editor
                 pImage.objectReferenceValue = newTex;
             }
         }
+
 
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");
