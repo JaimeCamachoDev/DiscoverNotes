@@ -366,16 +366,8 @@ public class GameObjectNotesEditor : Editor
         var pImage = pNote.FindPropertyRelative("discoverImage");
         if (pImage != null)
         {
-            EditorGUI.BeginChangeCheck();
-            var newTex = (Texture2D)EditorGUILayout.ObjectField(
-                DiscoverImageContent,
-                pImage.objectReferenceValue,
-                typeof(Texture2D),
-                false);
-            if (EditorGUI.EndChangeCheck())
-            {
-                pImage.objectReferenceValue = newTex;
-            }
+            Rect imageRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight);
+            EditorGUI.PropertyField(imageRect, pImage, DiscoverImageContent);
         }
 
 
