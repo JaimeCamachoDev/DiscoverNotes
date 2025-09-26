@@ -252,7 +252,7 @@ public static class NoteStylesProvider
             }
 
             if (string.IsNullOrEmpty(s_cachedScriptPath))
-                return "Assets/Notes/NoteStyles.asset"; // fallback
+                return "Assets/5-Settings/NoteStyles.asset"; // fallback en Settings
         }
 
         var dir = Path.GetDirectoryName(s_cachedScriptPath)?.Replace("\\", "/");   // .../Core
@@ -260,7 +260,7 @@ public static class NoteStylesProvider
         if (!string.IsNullOrEmpty(parent))
             return $"{parent}/NoteStyles.asset";
 
-        return "Assets/Notes/NoteStyles.asset";
+        return "Assets/5-Settings/NoteStyles.asset";
     }
 
     static void EnsureFolderExists(string folderPath)

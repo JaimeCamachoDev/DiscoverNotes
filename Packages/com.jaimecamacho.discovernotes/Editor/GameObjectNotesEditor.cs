@@ -45,8 +45,6 @@ public class GameObjectNotesEditor : Editor
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
     private const int EDIT_MIN_LINES = 3;     // min visible
     private const int EDIT_MAX_LINES = 15;    // max visible
-                                              // Posición exacta del último clic en pantalla para el calendario
-    private Vector2? _calendarClickScreen;
 
     private Vector2 _editScroll;
 
@@ -357,29 +355,14 @@ public class GameObjectNotesEditor : Editor
         DrawDiscoverDisciplinePopup(disciplineRect, pDiscipline);
         EditorIconHelper.DrawIconPopupAuthor(authorRect, pAuthor, NoteStylesProvider.GetAuthors());
 
-        // Botón fecha con popup anclado al click real
+        // Botón fecha con popup anclado al rect del control
         Rect row2 = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4);
         string label = string.IsNullOrEmpty(pDate.stringValue) ? DateTime.Now.ToString("dd/MM/yyyy") : pDate.stringValue;
-
-        var e = Event.current;
-        if (e.type == EventType.MouseDown && row2.Contains(e.mousePosition))
-            _calendarClickScreen = GUIUtility.GUIToScreenPoint(e.mousePosition);
 
         if (GUI.Button(row2, new GUIContent(label, EditorIconHelper.GetCalendarIcon().image)))
         {
             DateTime initial = ParseDateOrToday(label);
-            Rect anchor;
-            if (_calendarClickScreen.HasValue)
-            {
-                Vector2 p = _calendarClickScreen.Value;
-                anchor = new Rect(p.x, p.y, 1f, 1f);
-            }
-            else
-            {
-                Vector2 tl = GUIUtility.GUIToScreenPoint(new Vector2(row2.x, row2.y));
-                anchor = new Rect(tl.x + row2.width * 0.5f, tl.y + row2.height, 1f, 1f);
-            }
-            _calendarClickScreen = null;
+            Rect anchor = GUIUtility.GUIToScreenRect(row2);
 
             PopupWindow.Show(anchor, new CalendarPopup(initial, picked =>
             {
