@@ -28,7 +28,9 @@ public static class NotesHierarchyHover
 
         if (!fullRowRect.Contains(e.mousePosition))
         {
-            // No cerramos aquí para respetar chinchetas (CloseAll lo hace en otros hooks)
+            if (comp == null) continue;
+            if (!comp.ShowInHierarchy) continue;
+                if (!n.showInHierarchy) continue;
             return;
         }
 
@@ -38,7 +40,7 @@ public static class NotesHierarchyHover
         var comps = go.GetComponents<GameObjectNotes>();
         if (comps == null || comps.Length == 0) return;
 
-        // Reúne todas las notas vivas (no "borradas" = Fixed + vacío)
+        // ReÃºne todas las notas vivas (no "borradas" = Fixed + vacÃ­o)
         var noteRefs = new List<(GameObjectNotes owner, GameObjectNotes.NoteData note, int noteIndex)>();
         for (int c = 0; c < comps.Length; c++)
         {
@@ -50,13 +52,13 @@ public static class NotesHierarchyHover
                 var n = list[i];
                 if (n == null) continue;
                 if (GameObjectNotes.IsDeleted(n)) continue; // no mostrar "borradas"
-                                                            // Por petición posterior: tooltips SIEMPRE al hover ? ignoramos showInHierarchy
+                                                            // Por peticiÃ³n posterior: tooltips SIEMPRE al hover ? ignoramos showInHierarchy
                 noteRefs.Add((comp, n, i));
             }
         }
         if (noteRefs.Count == 0) { return; }
 
-        // Ancla = área del nombre (corrigiendo indent)
+        // Ancla = Ã¡rea del nombre (corrigiendo indent)
         var anchorLocalRect = selectionRect;
         Vector2 topLeft = GUIUtility.GUIToScreenPoint(anchorLocalRect.position);
         var baseAnchor = new Rect(topLeft.x, topLeft.y, anchorLocalRect.width, anchorLocalRect.height);
