@@ -154,7 +154,6 @@ MonoBehaviour:
   notes: 
   displayMode: 0
   showInHierarchy: 1
-  tooltipPinned: 0
   notesList:
   - author: Carlos
     dateCreated: 12/09/2024
@@ -168,7 +167,6 @@ MonoBehaviour:
       dk+asojdop\xE0sdjsopajds\n[img=10](GlobalObjectId_V1-1-29503919af45e8c4ab52a58d2583fc43-2800000-0)"
     displayMode: 0
     showInHierarchy: 1
-    tooltipPinned: 0
 --- !u!4 &335542500
 Transform:
   m_ObjectHideFlags: 0
@@ -340,7 +338,6 @@ MonoBehaviour:
   notes: 
   displayMode: 0
   showInHierarchy: 1
-  tooltipPinned: 0
   notesList:
   - author: Gaspar
     dateCreated: 05/09/2024
@@ -371,7 +368,6 @@ MonoBehaviour:
       bottom](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)"
     displayMode: 0
     showInHierarchy: 1
-    tooltipPinned: 0
 --- !u!4 &1409662643
 Transform:
   m_ObjectHideFlags: 0
