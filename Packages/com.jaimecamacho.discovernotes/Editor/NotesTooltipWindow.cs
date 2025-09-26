@@ -166,7 +166,6 @@ public class NotesTooltipWindow : EditorWindow
 
         // --- CABECERA (meta) para el título de la banda superior ---
         string author = string.IsNullOrEmpty(_noteData?.author) ? "Anónimo" : _noteData.author;
-        string date = string.IsNullOrEmpty(_noteData?.dateCreated) ? DateTime.Now.ToString("dd/MM/yyyy") : _noteData.dateCreated;
 
         string discipline = _noteData != null
             ? DiscoverCategoryUtility.GetDisplayName(_noteData.discoverCategory)
@@ -182,7 +181,7 @@ public class NotesTooltipWindow : EditorWindow
         );
 
         // IMPORTANTE: inicializamos titleGC para que jamás sea null
-        titleGC = new GUIContent(BuildOneLineTitle(metaCat, author, date, maxTitleW, titleStyle));
+        titleGC = new GUIContent(BuildOneLineTitle(metaCat, author, maxTitleW, titleStyle));
 
 
 
@@ -253,24 +252,21 @@ public class NotesTooltipWindow : EditorWindow
 
     }
 
-        string BuildOneLineTitle(string category, string author, string date, float maxW, GUIStyle st)
+        string BuildOneLineTitle(string category, string author, float maxW, GUIStyle st)
     {
         string Sep = "  •  ";
         string Bold(string s) => $"<b>{s}</b>";
-        string Compose(string c, string a, string d) => $"{Bold(c)}{Sep}{a}{Sep}{d}";
+        string Compose(string c, string a) => $"{Bold(c)}{Sep}{a}";
 
-        string c = category, a = author, d = date;
+        string c = category, a = author;
 
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
+        if (st.CalcSize(new GUIContent(Compose(c, a))).x <= maxW) return Compose(c, a);
 
-        c = ShrinkPart(c, cx => Compose(cx, a, d), maxW, st);
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
+        c = ShrinkPart(c, cx => Compose(cx, a), maxW, st);
+        if (st.CalcSize(new GUIContent(Compose(c, a))).x <= maxW) return Compose(c, a);
 
-        a = ShrinkPart(a, ax => Compose(c, ax, d), maxW, st);
-        if (st.CalcSize(new GUIContent(Compose(c, a, d))).x <= maxW) return Compose(c, a, d);
-
-        d = ShrinkPart(d, dx => Compose(c, a, dx), maxW, st);
-        return Compose(c, a, d);
+        a = ShrinkPart(a, ax => Compose(c, ax), maxW, st);
+        return Compose(c, a);
     }
 
     string ShrinkPart(string original, Func<string, string> withPart, float maxW, GUIStyle st)
