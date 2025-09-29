@@ -42,6 +42,8 @@ public class GameObjectNotesEditor : Editor
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
     static readonly GUIContent SectionTitleContent = new GUIContent("Título de la sección");
     static readonly GUIContent RemoveSectionButtonContent = new GUIContent("Eliminar");
+    static readonly GUIContent AddSectionButtonContent = new GUIContent("Añadir sección");
+    static readonly GUIContent NoteActionsContent = new GUIContent("Acciones de la nota");
     static readonly GUIContent AddNoteButtonContent = new GUIContent("Añadir nota");
     static readonly GUIContent RemoveNoteButtonContent = new GUIContent("Eliminar nota");
 
@@ -542,9 +544,37 @@ public class GameObjectNotesEditor : Editor
         if (pNote == null) return;
 
         var pSections = pNote.FindPropertyRelative("discoverSections");
-        EditorGUILayout.LabelField(DiscoverSectionsContent, EditorStyles.boldLabel);
 
-        if (pSections == null)
+        Rect headerRect = EditorGUILayout.GetControlRect();
+        Rect indentedRect = EditorGUI.IndentedRect(headerRect);
+        bool sectionsValid = pSections != null;
+        const float sectionButtonWidth = 140f;
+        const float sectionButtonSpacing = 6f;
+        Rect sectionLabelRect = new Rect(
+            indentedRect.x,
+            indentedRect.y,
+            Mathf.Max(0f, indentedRect.width - sectionButtonWidth - sectionButtonSpacing),
+            indentedRect.height
+        );
+        Rect sectionButtonRect = new Rect(
+            indentedRect.xMax - sectionButtonWidth,
+            indentedRect.y,
+            sectionButtonWidth,
+            indentedRect.height
+        );
+
+        EditorGUI.LabelField(sectionLabelRect, DiscoverSectionsContent, EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledGroupScope(!sectionsValid))
+        {
+            if (GUI.Button(sectionButtonRect, AddSectionButtonContent, EditorStyles.miniButton))
+            {
+                AddSection(pSections);
+                return;
+            }
+        }
+
+        if (!sectionsValid)
         {
             EditorGUILayout.HelpBox("No se pudieron cargar las secciones.", MessageType.Info);
             return;
@@ -584,16 +614,6 @@ public class GameObjectNotesEditor : Editor
                 if (removeIndex >= 0) break;
             }
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button("Añadir sección", GUILayout.Width(140f)))
-                {
-                    AddSection(pSections);
-                    return;
-                }
-                GUILayout.FlexibleSpace();
-            }
         }
 
         if (removeIndex >= 0)
@@ -646,19 +666,21 @@ public class GameObjectNotesEditor : Editor
         GUILayout.Space(8);
         DrawDiscoverSectionsEdit(pNote, noteIndex);
 
-        GUILayout.Space(8);
-        using (new EditorGUILayout.HorizontalScope())
+        GUILayout.Space(12f);
+        EditorGUILayout.LabelField(NoteActionsContent, EditorStyles.miniBoldLabel);
+        using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
         {
             GUILayout.FlexibleSpace();
-
-            if (GUILayout.Button(RemoveNoteButtonContent, EditorStyles.miniButtonLeft, GUILayout.Width(120f)))
+            if (GUILayout.Button(RemoveNoteButtonContent, GUILayout.Width(140f)))
             {
                 if (RemoveNoteAtIndex(pList, noteIndex))
                     return;
                 GUIUtility.ExitGUI();
             }
 
-            if (GUILayout.Button(AddNoteButtonContent, EditorStyles.miniButtonRight, GUILayout.Width(120f)))
+            GUILayout.Space(8f);
+
+            if (GUILayout.Button(AddNoteButtonContent, GUILayout.Width(140f)))
             {
                 AddNoteAtIndex(pList, noteIndex + 1);
                 GUIUtility.ExitGUI();
