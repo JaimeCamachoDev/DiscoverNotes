@@ -78,6 +78,7 @@ public class GameObjectNotesEditor : Editor
     }
 
     static readonly Dictionary<int, PreviewCache> s_preview = new Dictionary<int, PreviewCache>();
+    static readonly Dictionary<int, PreviewCache> s_sectionPreview = new Dictionary<int, PreviewCache>();
     static readonly Dictionary<int, bool> s_fixedBodyCollapsed = new Dictionary<int, bool>();
 
     static int s_lastUndoEventId = -1;
@@ -626,6 +627,7 @@ public class GameObjectNotesEditor : Editor
 
         serializedObject.ApplyModifiedProperties();
         serializedObject.Update();
+        s_sectionPreview.Clear();
     }
 
     void RemoveSectionAt(SerializedProperty pSections, int removeIndex)
@@ -636,6 +638,7 @@ public class GameObjectNotesEditor : Editor
         pSections.DeleteArrayElementAtIndex(removeIndex);
         serializedObject.ApplyModifiedProperties();
         serializedObject.Update();
+        s_sectionPreview.Clear();
     }
 
     void DrawDiscoverContent_Edit(SerializedProperty pNote, SerializedProperty pList, int noteIndex)
@@ -725,11 +728,7 @@ public class GameObjectNotesEditor : Editor
 
                 GUILayout.Space(2f);
 
-                // Contenido plano
-                if (pContent != null && !string.IsNullOrWhiteSpace(pContent.stringValue))
-                {
-                    EditorGUILayout.LabelField(pContent.stringValue, EditorStyles.label, GUILayout.MinHeight(18f));
-                }
+                DrawSectionRichContent(pContent);
             }
 
             GUILayout.Space(6);
@@ -1061,7 +1060,7 @@ public class GameObjectNotesEditor : Editor
             Rect bodyR = new Rect(inner.x, inner.y + titleH + titleGap, inner.width, cache.bodyH);
             RenderBodyWithInlineImages(cache, bodyR);
             HandleLinksClicks(cache);
-            HandleChecklistClicks_PerNote(bodyR, cache, pBody, key);
+            HandleChecklistClicksForProperty(bodyR, cache, pBody, key, k => s_preview.Remove(k));
             HandleImageClicks(cache);
         }
 
@@ -1072,8 +1071,80 @@ public class GameObjectNotesEditor : Editor
     int NoteCacheKey(int instanceId, string propertyPath)
         => unchecked((instanceId * 397) ^ propertyPath.GetHashCode());
 
-    void HandleChecklistClicks_PerNote(Rect bodyR, PreviewCache cache, SerializedProperty pBody, int cacheKey)
+    int SectionCacheKey(int instanceId, string propertyPath)
+        => unchecked((instanceId * 397) ^ propertyPath.GetHashCode());
+
+    void DrawSectionRichContent(SerializedProperty pContent)
     {
+        if (pContent == null) return;
+
+        string raw = pContent.stringValue ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            GUILayout.Space(2f);
+            return;
+        }
+
+        int key = SectionCacheKey(tgt.GetInstanceID(), pContent.propertyPath);
+        if (!s_sectionPreview.TryGetValue(key, out var cache) || cache == null)
+        {
+            cache = new PreviewCache();
+            s_sectionPreview[key] = cache;
+        }
+
+        float availWidth = Mathf.Max(120f, EditorGUIUtility.currentViewWidth - 60f);
+        int textHash = raw.GetHashCode();
+        if (cache.textHash != textHash || Mathf.Abs(cache.width - availWidth) > 0.5f)
+        {
+            RefreshSectionCache(cache, raw, availWidth);
+        }
+
+        Rect layoutRect = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
+                                                   GUILayout.ExpandWidth(true),
+                                                   GUILayout.Height(cache.bodyH));
+        Rect bodyRect = layoutRect;
+        bodyRect.x += 4f;
+        bodyRect.width = Mathf.Max(10f, bodyRect.width - 8f);
+        bodyRect.height = cache.bodyH;
+
+        var prevColor = ttBodyStyle.normal.textColor;
+        ttBodyStyle.normal.textColor = EditorStyles.label.normal.textColor;
+
+        RenderBodyWithInlineImages(cache, bodyRect);
+        HandleLinksClicks(cache);
+        HandleChecklistClicksForProperty(bodyRect, cache, pContent, key, k => s_sectionPreview.Remove(k));
+        HandleImageClicks(cache);
+
+        ttBodyStyle.normal.textColor = prevColor;
+    }
+
+    void RefreshSectionCache(PreviewCache cache, string raw, float availWidth)
+    {
+        if (cache == null) return;
+
+        cache.textHash = raw != null ? raw.GetHashCode() : 0;
+        cache.width = availWidth;
+
+        cache.links.Clear();
+        cache.checks.Clear();
+        cache.images.Clear();
+
+        string styled = LinkMarkup.BuildStyled(raw ?? string.Empty, cache.links, cache.checks, cache.images, out cache.indexMap);
+        cache.bodyGC = new GUIContent(styled);
+
+        float innerWidth = Mathf.Max(40f, availWidth - 16f);
+        cache.innerWidth = innerWidth;
+
+        float textH = ttBodyStyle.CalcHeight(cache.bodyGC, innerWidth);
+        ComputeImageLayout(cache, innerWidth, ttBodyStyle, out float extraH);
+        cache.bodyH = Mathf.Max(18f, textH + extraH);
+    }
+
+    void HandleChecklistClicksForProperty(Rect bodyR, PreviewCache cache, SerializedProperty property,
+                                          int cacheKey, Action<int> invalidateCache)
+    {
+        if (property == null || cache == null) return;
+
         var e = Event.current;
         foreach (var ck in cache.checks)
         {
@@ -1082,16 +1153,17 @@ public class GameObjectNotesEditor : Editor
                 bool newVal = GUI.Toggle(r, ck.isChecked, GUIContent.none);
                 if (newVal != ck.isChecked)
                 {
-                    string cur = pBody.stringValue ?? string.Empty;
+                    string cur = property.stringValue ?? string.Empty;
                     string updated = LinkMarkup.ToggleChecklistAt(cur, ck.rawStateCharIndex, newVal);
                     if (updated != cur)
                     {
                         Undo.RecordObject(tgt, "Toggle Checklist");
-                        pBody.stringValue = updated;
+                        property.stringValue = updated;
                         serializedObject.ApplyModifiedProperties();
-                        s_preview.Remove(cacheKey);
+                        invalidateCache?.Invoke(cacheKey);
                     }
-                    e.Use(); return;
+                    e.Use();
+                    return;
                 }
             }
         }
