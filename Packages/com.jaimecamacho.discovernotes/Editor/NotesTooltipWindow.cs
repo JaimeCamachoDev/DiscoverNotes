@@ -522,8 +522,9 @@ public class NotesTooltipWindow : EditorWindow
                             bodyStyle, new GUIContent(segText), segMap, tmp);
                         foreach (var t in tmp)
                         {
-                            var real = _links.Find(x => x.id == t.id && x.name == t.name &&
-                                                        x.vStart + segVisStart == t.vStart + segVisStart);
+                            var real = _links.Find(x => x.id == t.id
+                                                        && x.name == t.name
+                                                        && x.vStart == t.vStart + segVisStart);
                             if (real != null) real.hitRects.AddRange(t.hitRects);
                         }
                     }
@@ -627,8 +628,9 @@ public class NotesTooltipWindow : EditorWindow
                         bodyStyle, new GUIContent(segText), segMap, tmp);
                     foreach (var t in tmp)
                     {
-                        var real = _links.Find(x => x.id == t.id && x.name == t.name &&
-                                                    x.vStart + segVisStart == t.vStart + segVisStart);
+                        var real = _links.Find(x => x.id == t.id
+                                                    && x.name == t.name
+                                                    && x.vStart == t.vStart + segVisStart);
                         if (real != null) real.hitRects.AddRange(t.hitRects);
                     }
                 }

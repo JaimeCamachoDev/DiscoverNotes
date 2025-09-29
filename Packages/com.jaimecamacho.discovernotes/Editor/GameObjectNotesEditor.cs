@@ -1244,8 +1244,9 @@ public class GameObjectNotesEditor : Editor
                             ttBodyStyle, new GUIContent(segText), segMap, tmp);
                         foreach (var t in tmp)
                         {
-                            var real = cache.links.Find(x => x.id == t.id && x.name == t.name &&
-                                                             x.vStart + segVisStart == t.vStart + segVisStart);
+                            var real = cache.links.Find(x => x.id == t.id
+                                                             && x.name == t.name
+                                                             && x.vStart == t.vStart + segVisStart);
                             if (real != null) real.hitRects.AddRange(t.hitRects);
                         }
                     }
@@ -1351,8 +1352,9 @@ public class GameObjectNotesEditor : Editor
                         ttBodyStyle, new GUIContent(segText), segMap, tmp);
                     foreach (var t in tmp)
                     {
-                        var real = cache.links.Find(x => x.id == t.id && x.name == t.name &&
-                                                         x.vStart + segVisStart == t.vStart + segVisStart);
+                        var real = cache.links.Find(x => x.id == t.id
+                                                         && x.name == t.name
+                                                         && x.vStart == t.vStart + segVisStart);
                         if (real != null) real.hitRects.AddRange(t.hitRects);
                     }
                 }
