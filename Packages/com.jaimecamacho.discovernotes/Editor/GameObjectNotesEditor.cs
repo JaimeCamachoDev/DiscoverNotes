@@ -18,7 +18,6 @@ public class GameObjectNotesEditor : Editor
     private GUIStyle squareIconBtn;
     private Texture2D _btnBgNormal, _btnBgHover, _btnBgActive;
     private GUIStyle cardStyle, notesAreaStyle, ttTitleStyle, ttBodyStyle;
-    private GUIStyle imageIconStyle;
     private static Texture2D solidTex;
     private static Color lastCardBg = new Color(0, 0, 0, 0);
     private bool stylesReady;
@@ -32,8 +31,7 @@ public class GameObjectNotesEditor : Editor
     const float PADDING = 10f;
     const float ICON = 16f;
     const float ICON_PAD = 2f;
-    const float HEADER_IMAGE_SIZE = 40f;
-    const float SECTION_IMAGE_SIZE = 32f;
+    const float SECTION_CONTROL_MIN_WIDTH = 100f;
 
     static readonly GUIContent NoteTitleContent = new GUIContent(
         "Título de la nota",
@@ -41,13 +39,13 @@ public class GameObjectNotesEditor : Editor
     static readonly GUIContent DiscoverDisciplineContent = new GUIContent(
         "Área",
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
-    static readonly GUIContent DiscoverImageContent = new GUIContent("Imagen principal");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
     static readonly GUIContent AddNoteButtonContent = new GUIContent("Añadir nota");
     static readonly GUIContent RemoveNoteButtonContent = new GUIContent("Eliminar nota");
 
     // Edición en TextArea (plana con scrollbar)
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
+    private const string SectionControlName = "SECTION_TEXTAREA_CONTROL";
     private const int EDIT_MIN_LINES = 3;     // min visible
     private const int EDIT_MAX_LINES = 15;    // max visible
 
@@ -225,15 +223,6 @@ public class GameObjectNotesEditor : Editor
             squareIconBtn.active.background = _btnBgActive;
         }
 
-        if (imageIconStyle == null)
-        {
-            imageIconStyle = new GUIStyle(GUIStyle.none)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                margin = new RectOffset(0, 0, 0, 0),
-                padding = new RectOffset(0, 0, 0, 0)
-            };
-        }
         if (pinIcon == null || (pinIcon.image == null && string.IsNullOrEmpty(pinIcon.text)))
         {
             pinIcon = EditorIconHelper.GetStarIcon();
@@ -260,16 +249,6 @@ public class GameObjectNotesEditor : Editor
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            // Imagen
-            var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
-            var headerTex = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
-            if (headerTex != null)
-            {
-                GUILayout.Label(new GUIContent(headerTex), imageIconStyle,
-                    GUILayout.Width(HEADER_IMAGE_SIZE), GUILayout.Height(HEADER_IMAGE_SIZE));
-                GUILayout.Space(6f);
-            }
-
             bool isEdit = pMode.enumValueIndex == (int)GameObjectNotes.DisplayMode.Edit;
             var pShowHierarchy = pNote.FindPropertyRelative("showInHierarchy");
             bool showInHierarchy = pShowHierarchy == null || pShowHierarchy.boolValue;
@@ -378,17 +357,6 @@ public class GameObjectNotesEditor : Editor
         {
             EditorGUILayout.PropertyField(pTitle, NoteTitleContent);
         }
-
-
-        // NUEVO: imagen principal debajo del título
-        var pImage = pNote.FindPropertyRelative("discoverImage");
-        if (pImage != null)
-        {
-            Rect imageRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight);
-            EditorGUI.PropertyField(imageRect, pImage, DiscoverImageContent);
-        }
-
-
         var pAuthor = pNote.FindPropertyRelative("author");
         var pCategory = pNote.FindPropertyRelative("category");
         var pDiscipline = pNote.FindPropertyRelative("discoverCategory");
@@ -449,33 +417,47 @@ public class GameObjectNotesEditor : Editor
     void DrawEditableNotes_PlainAutoHeight_PerNote(SerializedProperty pNote, int noteIndex)
     {
         var pBody = pNote.FindPropertyRelative("notes");
-        EditorGUILayout.LabelField("Descripcion (texto plano; se interpreta al mostrar)", EditorStyles.boldLabel);
+        DrawPlainTextArea(
+            pBody,
+            new GUIContent("Descripcion (texto plano; se interpreta al mostrar)"),
+            EditorStyles.boldLabel,
+            $"{NotesControlName}_{noteIndex}",
+            "Edit Notes"
+        );
+    }
 
-        string text = pBody.stringValue ?? string.Empty;
-        float viewW = Mathf.Max(100f, EditorGUIUtility.currentViewWidth - 36f);
+    void DrawPlainTextArea(SerializedProperty property, GUIContent label, GUIStyle labelStyle,
+                           string controlName, string undoLabel, float minWidth = 100f)
+    {
+        if (property == null) return;
+
+        if (label != null)
+            EditorGUILayout.LabelField(label, labelStyle ?? EditorStyles.boldLabel);
+
+        string text = property.stringValue ?? string.Empty;
+        float viewW = Mathf.Max(minWidth, EditorGUIUtility.currentViewWidth - 36f);
         float targetH = notesAreaStyle.CalcHeight(new GUIContent(string.IsNullOrEmpty(text) ? " " : text), viewW);
 
         Rect areaRect = EditorGUILayout.GetControlRect(false, targetH, GUILayout.ExpandWidth(true));
 
-        string controlName = $"{NotesControlName}_{noteIndex}";
-        ArmUndoIfTyping_PerNote(areaRect, controlName);
+        ArmUndoIfTyping(controlName, undoLabel);
 
         GUI.SetNextControlName(controlName);
         EditorGUI.BeginChangeCheck();
         string after = EditorGUI.TextArea(areaRect, text, notesAreaStyle);
         if (EditorGUI.EndChangeCheck())
         {
-            Undo.RecordObject(tgt, "Edit Notes");
-            pBody.stringValue = after;
+            Undo.RecordObject(tgt, undoLabel);
+            property.stringValue = after;
             serializedObject.ApplyModifiedProperties();
         }
 
-        HandleDragAndDropIntoTextArea(areaRect, pBody);
+        HandleDragAndDropIntoTextArea(areaRect, property, undoLabel);
         if (Event.current.type == EventType.ExecuteCommand && Event.current.commandName == "UndoRedoPerformed")
             Repaint();
     }
 
-    void ArmUndoIfTyping_PerNote(Rect areaRect, string controlName)
+    void ArmUndoIfTyping(string controlName, string undoLabel)
     {
         var e = Event.current;
         bool focused = GUI.GetNameOfFocusedControl() == controlName;
@@ -491,14 +473,14 @@ public class GameObjectNotesEditor : Editor
             int evtId = e.GetHashCode();
             if (evtId != s_lastUndoEventId)
             {
-                Undo.RecordObject(tgt, "Edit Notes");
+                Undo.RecordObject(tgt, undoLabel);
                 s_lastUndoEventId = evtId;
             }
         }
     }
 
 
-    void HandleDragAndDropIntoTextArea(Rect areaRect, SerializedProperty pNotes)
+    void HandleDragAndDropIntoTextArea(Rect areaRect, SerializedProperty property, string undoLabel)
     {
         var e = Event.current;
         if ((e.type != EventType.DragUpdated && e.type != EventType.DragPerform) || !areaRect.Contains(e.mousePosition))
@@ -535,15 +517,15 @@ public class GameObjectNotesEditor : Editor
         {
             DragAndDrop.AcceptDrag();
 
-            string cur = pNotes.stringValue ?? string.Empty;
+            string cur = property.stringValue ?? string.Empty;
 
             // SIEMPRE al principio + con salto de línea al final de lo insertado
             string insert = sb.ToString();
             if (!insert.EndsWith("\n")) insert += "\n";
             string composed = insert + cur;
 
-            Undo.RecordObject(tgt, "Insert DnD");
-            pNotes.stringValue = composed;
+            Undo.RecordObject(tgt, undoLabel);
+            property.stringValue = composed;
             serializedObject.ApplyModifiedProperties();
 
             e.Use();
@@ -552,18 +534,124 @@ public class GameObjectNotesEditor : Editor
     }
 
 
+    void DrawDiscoverSectionsEdit(SerializedProperty pNote, int noteIndex)
+    {
+        if (pNote == null) return;
+
+        var pSections = pNote.FindPropertyRelative("discoverSections");
+        EditorGUILayout.LabelField(DiscoverSectionsContent, EditorStyles.boldLabel);
+
+        if (pSections == null)
+        {
+            EditorGUILayout.HelpBox("No se pudieron cargar las secciones.", MessageType.Info);
+            return;
+        }
+
+        GUILayout.Space(2f);
+
+        int removeIndex = -1;
+        using (new EditorGUI.IndentLevelScope())
+        {
+            for (int i = 0; i < pSections.arraySize; i++)
+            {
+                var pSection = pSections.GetArrayElementAtIndex(i);
+                if (pSection == null) continue;
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    var pName = pSection.FindPropertyRelative("sectionName");
+                    var pTarget = pSection.FindPropertyRelative("target");
+                    var pContent = pSection.FindPropertyRelative("sectionContent");
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.PropertyField(pName, new GUIContent("Título"));
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("Eliminar", EditorStyles.miniButton, GUILayout.Width(70f)))
+                            removeIndex = i;
+                    }
+
+                    EditorGUILayout.PropertyField(pTarget, new GUIContent("Target"));
+
+                    GUILayout.Space(2f);
+
+                    DrawPlainTextArea(
+                        pContent,
+                        new GUIContent("Contenido (texto plano; se interpreta al mostrar)"),
+                        EditorStyles.miniBoldLabel,
+                        $"{SectionControlName}_{noteIndex}_{i}",
+                        "Edit Section",
+                        SECTION_CONTROL_MIN_WIDTH
+                    );
+                }
+
+                GUILayout.Space(6f);
+
+                if (removeIndex >= 0) break;
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Añadir sección", GUILayout.Width(140f)))
+                {
+                    AddSection(pSections);
+                    return;
+                }
+                GUILayout.FlexibleSpace();
+            }
+        }
+
+        if (removeIndex >= 0)
+        {
+            RemoveSectionAt(pSections, removeIndex);
+            return;
+        }
+    }
+
+    void AddSection(SerializedProperty pSections)
+    {
+        if (pSections == null) return;
+
+        Undo.RecordObject(tgt, "Añadir sección");
+        int newIndex = Mathf.Max(0, pSections.arraySize);
+        pSections.InsertArrayElementAtIndex(newIndex);
+
+        var pNew = pSections.GetArrayElementAtIndex(newIndex);
+        if (pNew != null)
+        {
+            var pName = pNew.FindPropertyRelative("sectionName");
+            if (pName != null) pName.stringValue = string.Empty;
+
+            var pTarget = pNew.FindPropertyRelative("target");
+            if (pTarget != null) pTarget.objectReferenceValue = null;
+
+            var pContent = pNew.FindPropertyRelative("sectionContent");
+            if (pContent != null) pContent.stringValue = string.Empty;
+
+            var pActions = pNew.FindPropertyRelative("actions");
+            if (pActions != null && pActions.isArray)
+                pActions.arraySize = 0;
+        }
+
+        serializedObject.ApplyModifiedProperties();
+        serializedObject.Update();
+    }
+
+    void RemoveSectionAt(SerializedProperty pSections, int removeIndex)
+    {
+        if (pSections == null || removeIndex < 0 || removeIndex >= pSections.arraySize) return;
+
+        Undo.RecordObject(tgt, "Eliminar sección");
+        pSections.DeleteArrayElementAtIndex(removeIndex);
+        serializedObject.ApplyModifiedProperties();
+        serializedObject.Update();
+    }
+
     void DrawDiscoverContent_Edit(SerializedProperty pNote, SerializedProperty pList, int noteIndex)
     {
         GUILayout.Space(8);
-        // Quitamos el título duplicado y la imagen (la imagen ya va debajo del título).
-        using (new EditorGUI.IndentLevelScope())
-        {
-            EditorGUILayout.PropertyField(
-                pNote.FindPropertyRelative("discoverSections"),
-                DiscoverSectionsContent,
-                true
-            );
-        }
+        DrawDiscoverSectionsEdit(pNote, noteIndex);
 
         GUILayout.Space(8);
         using (new EditorGUILayout.HorizontalScope())
@@ -590,7 +678,6 @@ public class GameObjectNotesEditor : Editor
 
     void DrawDiscoverContent_Fixed(SerializedProperty pNote)
     {
-        var pImage = pNote.FindPropertyRelative("discoverImage");
         var pSections = pNote.FindPropertyRelative("discoverSections");
 
         bool hasSections = pSections != null && pSections.isArray && pSections.arraySize > 0;
@@ -614,7 +701,7 @@ public class GameObjectNotesEditor : Editor
 
         // (QUITADO) — No pintamos un título interno para evitar el "Humo" duplicado
 
-        // Secciones (cada sección ya dibuja su Target debajo de su imagen)
+        // Secciones (cada sección se encarga de su Target)
         DrawDiscoverSectionsFixed(pSections);
 
         // (QUITADO) — No hay "target" global; el target es por sección
@@ -639,8 +726,7 @@ public class GameObjectNotesEditor : Editor
             if (pSection == null) continue;
 
             var pName = pSection.FindPropertyRelative("sectionName");
-            var pImage = pSection.FindPropertyRelative("image");
-            var pTarget = pSection.FindPropertyRelative("target");           // <-- NUEVO
+            var pTarget = pSection.FindPropertyRelative("target");
             var pContent = pSection.FindPropertyRelative("sectionContent");
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -649,21 +735,11 @@ public class GameObjectNotesEditor : Editor
                 var title = (pName != null && !string.IsNullOrWhiteSpace(pName.stringValue))
                             ? pName.stringValue
                             : "Sección";
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (pImage != null && pImage.objectReferenceValue is Texture2D tex)
-                    {
-                        GUILayout.Label(new GUIContent(tex), imageIconStyle,
-                            GUILayout.Width(SECTION_IMAGE_SIZE), GUILayout.Height(SECTION_IMAGE_SIZE));
-                        GUILayout.Space(6f);
-                    }
-
-                    EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-                }
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
 
                 GUILayout.Space(2f);
 
-                // Target (debajo de la imagen) + botón "Ir"   ////  <<--- NUEVO BLOQUE
+                // Target + botón "Ir"
                 if (pTarget != null)
                 {
                     using (new EditorGUILayout.HorizontalScope())
@@ -753,7 +829,6 @@ public class GameObjectNotesEditor : Editor
         var pCategory = pNote.FindPropertyRelative("category");
         var pDiscoverName = pNote.FindPropertyRelative("discoverName");
         var pDiscoverCategory = pNote.FindPropertyRelative("discoverCategory");
-        var pDiscoverImage = pNote.FindPropertyRelative("discoverImage");
         var pDiscoverSummary = pNote.FindPropertyRelative("discoverSummary");
         var pDiscoverSections = pNote.FindPropertyRelative("discoverSections");
         var pNotes = pNote.FindPropertyRelative("notes");
@@ -776,9 +851,6 @@ public class GameObjectNotesEditor : Editor
 
         if (pDiscoverCategory != null)
             pDiscoverCategory.enumValueIndex = (int)DiscoverCategory.Other;
-
-        if (pDiscoverImage != null)
-            pDiscoverImage.objectReferenceValue = null;
 
         if (pDiscoverSummary != null)
             pDiscoverSummary.stringValue = string.Empty;
@@ -826,10 +898,6 @@ public class GameObjectNotesEditor : Editor
             ? NoteStylesProvider.GetDisciplineDisplayName((DiscoverCategory)pDiscipline.enumValueIndex)
             : NoteStylesProvider.GetDisciplineDisplayName(DiscoverCategory.Other);
 
-        var pHeaderImage = pNote.FindPropertyRelative("discoverImage");
-        var headerTexture = pHeaderImage != null ? pHeaderImage.objectReferenceValue as Texture2D : null;
-        int headerImageId = headerTexture != null ? headerTexture.GetInstanceID() : 0;
-
         string authorLabel = string.IsNullOrEmpty(author) ? "Anónimo" : author;
         var pBody = pNote.FindPropertyRelative("notes");
         string raw = pBody.stringValue ?? string.Empty;
@@ -841,12 +909,17 @@ public class GameObjectNotesEditor : Editor
         var accent = (cat != null ? cat.tooltipAccentBar : new Color(0.25f, 0.5f, 1f, 1f));
         bg.a = 1f;
 
+        Texture headerIconCandidate = (cat != null && cat.icon != null)
+            ? cat.icon
+            : (EditorIconHelper.GetCategoryIcon(category)?.image);
+        int headerIconId = headerIconCandidate != null ? headerIconCandidate.GetInstanceID() : 0;
+
         int key = NoteCacheKey(tgt.GetInstanceID(), pNote.propertyPath);
         if (!s_preview.TryGetValue(key, out var cache)) { cache = new PreviewCache(); s_preview[key] = cache; }
 
         int textHash = raw.GetHashCode();
         int metaHash = (category + "|" + authorLabel + "|" + discipline + "|" + title).GetHashCode();
-        metaHash = unchecked(metaHash * 397) ^ headerImageId;
+        metaHash = unchecked(metaHash * 397) ^ headerIconId;
         float availWidth = EditorGUIUtility.currentViewWidth - 20f;
         if (availWidth <= 0f) availWidth = 400f;
 
@@ -860,15 +933,8 @@ public class GameObjectNotesEditor : Editor
             cache.bg = bg;
             cache.accent = accent;
 
-            Texture headerIcon = headerTexture != null
-                ? (Texture)headerTexture
-                : (cat != null && cat.icon != null)
-                    ? cat.icon
-                    : (EditorIconHelper.GetCategoryIcon(category)?.image);
-            cache.icon = headerIcon;
-            cache.headerIconSize = headerIcon != null
-                ? (headerTexture != null ? HEADER_IMAGE_SIZE : ICON)
-                : 0f;
+            cache.icon = headerIconCandidate;
+            cache.headerIconSize = cache.icon != null ? ICON : 0f;
             cache.titleGC = new GUIContent($"<b>{title}</b>\n{category} • {discipline} • {authorLabel}");
 
             cache.links.Clear(); cache.checks.Clear(); cache.images.Clear();
