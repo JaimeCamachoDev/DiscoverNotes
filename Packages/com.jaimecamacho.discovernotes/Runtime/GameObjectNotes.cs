@@ -44,7 +44,6 @@ public class GameObjectNotes : MonoBehaviour
 
         public string discoverName = string.Empty;
         public DiscoverCategory discoverCategory = DiscoverCategory.Other;
-        public Texture2D discoverImage;
 
         [TextArea(2, 10)]
         public string discoverSummary = "";
@@ -63,8 +62,7 @@ public class GameObjectNotes : MonoBehaviour
 
         public bool HasDiscoverContent()
         {
-            return discoverImage != null
-                || !string.IsNullOrEmpty(discoverSummary)
+            return !string.IsNullOrEmpty(discoverSummary)
                 || (discoverSections != null && discoverSections.Count > 0);
         }
     }

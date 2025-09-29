@@ -160,7 +160,6 @@ MonoBehaviour:
     category: Info
     discoverName: GameObject (1)
     discoverCategory: 7
-    discoverImage: {fileID: 0}
     discoverSummary: 
     discoverSections: []
     notes: 
@@ -343,16 +342,13 @@ MonoBehaviour:
     category: Info
     discoverName: GameObject
     discoverCategory: 4
-    discoverImage: {fileID: 0}
     discoverSummary: holliiii
     discoverSections:
     - sectionName: DASDA
-      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
       target: {fileID: 0}
       sectionContent: 
       actions: []
     - sectionName: DASDA
-      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
       target: {fileID: 0}
       sectionContent: 
       actions: []
