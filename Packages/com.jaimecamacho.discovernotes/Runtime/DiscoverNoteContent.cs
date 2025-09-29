@@ -82,22 +82,18 @@ public static class DiscoverCategoryUtility
 
 /// <summary>
 /// A section of structured information inside a Discover note. Sections allow grouping
-/// rich descriptions, optional imagery and navigation actions.
+/// rich descriptions and navigation actions.
 /// </summary>
 [Serializable]
 public class DiscoverSection
 {
     public string sectionName;
-    public Texture2D image;
-
-    // NUEVO: objeto objetivo de la sección
-    public GameObject target;
 
     [TextArea(2, 6)]
     public string sectionContent;
 
     // Oculto: antiguo sistema de acciones (mantener temporalmente por compatibilidad)
-    [HideInInspector, Obsolete("Actions eliminado. Usa 'target' en la sección.")]
+    [HideInInspector, Obsolete("Actions eliminado.")]
     public List<DiscoverAction> actions = new List<DiscoverAction>();
 }
 

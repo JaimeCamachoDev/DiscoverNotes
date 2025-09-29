@@ -160,7 +160,6 @@ MonoBehaviour:
     category: Info
     discoverName: GameObject (1)
     discoverCategory: 7
-    discoverImage: {fileID: 0}
     discoverSummary: 
     discoverSections: []
     notes: 
@@ -343,18 +342,13 @@ MonoBehaviour:
     category: Info
     discoverName: GameObject
     discoverCategory: 4
-    discoverImage: {fileID: 0}
     discoverSummary: holliiii
     discoverSections:
     - sectionName: DASDA
-      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
-      target: {fileID: 0}
-      sectionContent: 
+      sectionContent:
       actions: []
     - sectionName: DASDA
-      image: {fileID: 10305, guid: 0000000000000000f000000000000000, type: 0}
-      target: {fileID: 0}
-      sectionContent: 
+      sectionContent:
       actions: []
     notes: "[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\nhOLA
       WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
