@@ -40,6 +40,8 @@ public class GameObjectNotesEditor : Editor
         "Área",
         "Disciplina o equipo responsable de la nota (Gameplay, FX, Audio, etc.).");
     static readonly GUIContent DiscoverSectionsContent = new GUIContent("Secciones");
+    static readonly GUIContent SectionTitleContent = new GUIContent("Título de la sección");
+    static readonly GUIContent RemoveSectionButtonContent = new GUIContent("Eliminar");
     static readonly GUIContent AddNoteButtonContent = new GUIContent("Añadir nota");
     static readonly GUIContent RemoveNoteButtonContent = new GUIContent("Eliminar nota");
 
@@ -560,18 +562,9 @@ public class GameObjectNotesEditor : Editor
                 using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
                     var pName = pSection.FindPropertyRelative("sectionName");
-                    var pTarget = pSection.FindPropertyRelative("target");
                     var pContent = pSection.FindPropertyRelative("sectionContent");
 
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.PropertyField(pName, new GUIContent("Título"));
-                        GUILayout.FlexibleSpace();
-                        if (GUILayout.Button("Eliminar", EditorStyles.miniButton, GUILayout.Width(70f)))
-                            removeIndex = i;
-                    }
-
-                    EditorGUILayout.PropertyField(pTarget, new GUIContent("Target"));
+                    DrawSectionHeaderWithRemove(pName, i, ref removeIndex);
 
                     GUILayout.Space(2f);
 
@@ -622,9 +615,6 @@ public class GameObjectNotesEditor : Editor
         {
             var pName = pNew.FindPropertyRelative("sectionName");
             if (pName != null) pName.stringValue = string.Empty;
-
-            var pTarget = pNew.FindPropertyRelative("target");
-            if (pTarget != null) pTarget.objectReferenceValue = null;
 
             var pContent = pNew.FindPropertyRelative("sectionContent");
             if (pContent != null) pContent.stringValue = string.Empty;
@@ -701,10 +691,7 @@ public class GameObjectNotesEditor : Editor
 
         // (QUITADO) — No pintamos un título interno para evitar el "Humo" duplicado
 
-        // Secciones (cada sección se encarga de su Target)
         DrawDiscoverSectionsFixed(pSections);
-
-        // (QUITADO) — No hay "target" global; el target es por sección
 
         GUILayout.EndVertical();
     }
@@ -726,7 +713,6 @@ public class GameObjectNotesEditor : Editor
             if (pSection == null) continue;
 
             var pName = pSection.FindPropertyRelative("sectionName");
-            var pTarget = pSection.FindPropertyRelative("target");
             var pContent = pSection.FindPropertyRelative("sectionContent");
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -739,30 +725,6 @@ public class GameObjectNotesEditor : Editor
 
                 GUILayout.Space(2f);
 
-                // Target + botón "Ir"
-                if (pTarget != null)
-                {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        using (new EditorGUI.DisabledScope(true))
-                            EditorGUILayout.ObjectField(GUIContent.none, pTarget.objectReferenceValue, typeof(GameObject), true);
-
-                        using (new EditorGUI.DisabledScope(pTarget.objectReferenceValue == null))
-                        {
-                            if (GUILayout.Button("Ir", GUILayout.Width(40f)))
-                            {
-                                var go = pTarget.objectReferenceValue as GameObject;
-                                if (go != null)
-                                {
-                                    Selection.activeObject = go;
-                                    if (SceneView.lastActiveSceneView != null)
-                                        SceneView.lastActiveSceneView.FrameSelected();
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Contenido plano
                 if (pContent != null && !string.IsNullOrWhiteSpace(pContent.stringValue))
                 {
@@ -772,6 +734,29 @@ public class GameObjectNotesEditor : Editor
 
             GUILayout.Space(6);
         }
+    }
+
+    void DrawSectionHeaderWithRemove(SerializedProperty pName, int sectionIndex, ref int removeIndex)
+    {
+        Rect headerRect = EditorGUILayout.GetControlRect();
+        const float spacing = 4f;
+        const float removeWidth = 70f;
+
+        Rect buttonRect = new Rect(headerRect.xMax - removeWidth, headerRect.y + 1f, removeWidth, EditorGUIUtility.singleLineHeight);
+        Rect fieldRect = new Rect(headerRect.x, headerRect.y, headerRect.width - removeWidth - spacing, headerRect.height);
+
+        if (fieldRect.width < 50f)
+            fieldRect.width = Mathf.Max(0f, headerRect.width - removeWidth);
+
+        if (pName != null)
+        {
+            EditorGUI.BeginProperty(fieldRect, SectionTitleContent, pName);
+            EditorGUI.PropertyField(fieldRect, pName, SectionTitleContent);
+            EditorGUI.EndProperty();
+        }
+
+        if (GUI.Button(buttonRect, RemoveSectionButtonContent, EditorStyles.miniButton))
+            removeIndex = sectionIndex;
     }
 
     void AddNoteAtIndex(SerializedProperty pList, int insertIndex)

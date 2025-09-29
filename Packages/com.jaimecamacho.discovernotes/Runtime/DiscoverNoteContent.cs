@@ -89,14 +89,11 @@ public class DiscoverSection
 {
     public string sectionName;
 
-    // NUEVO: objeto objetivo de la sección
-    public GameObject target;
-
     [TextArea(2, 6)]
     public string sectionContent;
 
     // Oculto: antiguo sistema de acciones (mantener temporalmente por compatibilidad)
-    [HideInInspector, Obsolete("Actions eliminado. Usa 'target' en la sección.")]
+    [HideInInspector, Obsolete("Actions eliminado.")]
     public List<DiscoverAction> actions = new List<DiscoverAction>();
 }
 

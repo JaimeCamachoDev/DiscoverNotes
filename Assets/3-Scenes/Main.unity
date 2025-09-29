@@ -345,12 +345,10 @@ MonoBehaviour:
     discoverSummary: holliiii
     discoverSections:
     - sectionName: DASDA
-      target: {fileID: 0}
-      sectionContent: 
+      sectionContent:
       actions: []
     - sectionName: DASDA
-      target: {fileID: 0}
-      sectionContent: 
+      sectionContent:
       actions: []
     notes: "[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\nhOLA
       WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
