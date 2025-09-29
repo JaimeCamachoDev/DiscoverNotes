@@ -156,14 +156,31 @@ MonoBehaviour:
   showInHierarchy: 1
   notesList:
   - author: "An\xF3nimo"
-    dateCreated: 26/09/2025
+    dateCreated: 29/09/2025
     category: Info
     discoverName: GameObject (1)
     discoverCategory: 7
     discoverSummary: 
-    discoverSections: []
+    discoverSections:
+    - sectionName: zxczcx
+      sectionContent: '[check] (caja1 [color=red](titulo1))
+
+        [check] (caja2
+        [color=blue](holi2))
+
+        [check] (caja3 [color=green](cosa3))
+
+        [check]
+        (caja3)'
+      actions: []
+    - sectionName: zxczxc
+      sectionContent: '[check] (Check [color=blue](Boxes))'
+      actions: []
+    - sectionName: zxczc
+      sectionContent: '[check] (Check [color=blue](Boxes))'
+      actions: []
     notes: 
-    displayMode: 0
+    displayMode: 1
     showInHierarchy: 1
 --- !u!4 &769943672
 Transform:
@@ -345,22 +362,26 @@ MonoBehaviour:
     discoverSummary: holliiii
     discoverSections:
     - sectionName: DASDA
-      sectionContent:
+      sectionContent: "[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\nhOLA
+        WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
+        escribe un [link externo](https://example.com/)\n\no un enlace a la [configuraci\xF3n](GlobalObjectId_V1-3-9d91d9558e0605f469c188cd46e35fe2-11400000-0)
+        del plugin\n\nIncluye cosas \xFAtiles como:\n\n[check] (Check [color=blue](Boxes))\n\n[bold](Negrita)
+        y [italics](cursiva)\n\n[color=red](Texto)[color=magenta]( de )[color=cyan](colores)
+        [size=20] ( y tama\xF1os)\n\nEmojis e im\xE1genes \uFFFD\uFFFD\n\n[size=8](Peque\xF1as:)\n\n[link
+        top](https://example.com/)\n\n[img=15](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
+        mid](https://example.com/)\n\n[size=20](Normales o grandes:)\n\n[img](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
+        bottom](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)"
       actions: []
-    - sectionName: DASDA
-      sectionContent:
-      actions: []
-    notes: "[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\nhOLA
-      WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
+    notes: "\nhOLA WENOS DIAS \n[Directional Light](GlobalObjectId_V1-2-ff5702dfe30c34fa2a680f20ba104712-1357732928-0)\n\n[tag](Carlos)
       escribe un [link externo](https://example.com/)\n\no un enlace a la [configuraci\xF3n](GlobalObjectId_V1-3-9d91d9558e0605f469c188cd46e35fe2-11400000-0)
       del plugin\n\nIncluye cosas \xFAtiles como:\n\n[check] (Check [color=blue](Boxes))\n\n[bold](Negrita)
       y [italics](cursiva)\n\n[color=red](Texto)[color=magenta]( de )[color=cyan](colores)
-      [size=20] ( y tama\xF1os)\n\nEmojis e im\xE1genes \uFFFD\uFFFD\n\n[size=8](Peque\xF1as:)\n\n[link
+      [size=20] ( y tama\xF1os)\n\nEmojis e im\xE1genes\U0001F600\n\n[size=8](Peque\xF1as:)\n\n[img](GlobalObjectId_V1-1-2b091dde63c2b2648a0b19e51912c794-2800000-0)\n\n[link
       top](https://example.com/)\n\n[img=15](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
       mid](https://example.com/)\n\n[size=20](Normales o grandes:)\n\n[img](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)\n\n[link
       bottom](GlobalObjectId_V1-1-3720f83c26517da4ab556c01fd617240-2800000-0)"
-    displayMode: 0
-    showInHierarchy: 1
+    displayMode: 1
+    showInHierarchy: 0
 --- !u!4 &1409662643
 Transform:
   m_ObjectHideFlags: 0
