@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -46,6 +47,20 @@ public class GameObjectNotesEditor : Editor
     static readonly GUIContent NoteActionsContent = new GUIContent("Acciones de la nota");
     static readonly GUIContent AddNoteButtonContent = new GUIContent("Añadir nota");
     static readonly GUIContent RemoveNoteButtonContent = new GUIContent("Eliminar nota");
+    static readonly GUIContent VatSectionTitleContent = new GUIContent("VAT UV Visual");
+    static readonly GUIContent VatReferenceTexturesContent = new GUIContent(
+        "Texturas de referencia",
+        "Lista de texturas base que se empaquetarán en un atlas de referencia para VAT UV Visual.");
+    static readonly GUIContent VatImagesCountContent = new GUIContent(
+        "Imágenes en el atlas",
+        "Número de texturas de la lista que se combinarán en el atlas final (se usan en orden).");
+    static readonly GUIContent VatColumnsContent = new GUIContent(
+        "Columnas",
+        "Cantidad de columnas que tendrá el atlas generado.");
+    static readonly GUIContent VatAtlasContent = new GUIContent(
+        "Atlas de referencia",
+        "Textura de atlas generada automáticamente para VAT UV Visual.");
+    static readonly GUIContent VatGenerateButtonContent = new GUIContent("Generar atlas VAT UV");
 
     // Edición en TextArea (plana con scrollbar)
     private const string NotesControlName = "NOTES_TEXTAREA_CONTROL";
@@ -666,6 +681,9 @@ public class GameObjectNotesEditor : Editor
         GUILayout.Space(8);
         DrawDiscoverSectionsEdit(pNote, noteIndex);
 
+        GUILayout.Space(10f);
+        DrawVatUvVisualSection(pNote);
+
         GUILayout.Space(12f);
         EditorGUILayout.LabelField(NoteActionsContent, EditorStyles.miniBoldLabel);
         using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
@@ -690,6 +708,269 @@ public class GameObjectNotesEditor : Editor
         }
     }
 
+    void DrawVatUvVisualSection(SerializedProperty pNote)
+    {
+        if (pNote == null) return;
+
+        var pReferenceTextures = pNote.FindPropertyRelative("vatReferenceTextures");
+        var pAtlas = pNote.FindPropertyRelative("vatReferenceAtlas");
+        var pImagesCount = pNote.FindPropertyRelative("vatAtlasImageCount");
+        var pColumns = pNote.FindPropertyRelative("vatAtlasColumnCount");
+
+        EditorGUILayout.LabelField(VatSectionTitleContent, EditorStyles.miniBoldLabel);
+        GUILayout.Space(2f);
+
+        if (pReferenceTextures != null)
+        {
+            EditorGUILayout.PropertyField(pReferenceTextures, VatReferenceTexturesContent, true);
+        }
+
+        int validTextures = CountValidVatTextures(pReferenceTextures);
+
+        using (new EditorGUI.IndentLevelScope())
+        {
+            if (validTextures > 0)
+            {
+                if (pImagesCount != null)
+                {
+                    int desired = pImagesCount.intValue <= 0 ? validTextures : pImagesCount.intValue;
+                    desired = Mathf.Clamp(desired, 1, validTextures);
+                    desired = EditorGUILayout.IntSlider(VatImagesCountContent, desired, 1, validTextures);
+                    pImagesCount.intValue = desired;
+
+                    if (pColumns != null)
+                    {
+                        int maxColumns = Mathf.Max(1, desired);
+                        int currentColumns = pColumns.intValue <= 0 ? Mathf.Min(desired, 4) : pColumns.intValue;
+                        currentColumns = Mathf.Clamp(currentColumns, 1, maxColumns);
+                        currentColumns = EditorGUILayout.IntSlider(VatColumnsContent, currentColumns, 1, maxColumns);
+                        pColumns.intValue = currentColumns;
+
+                        EditorGUILayout.LabelField(
+                            $"Se usarán las primeras {desired} texturas en el orden actual.",
+                            EditorStyles.miniLabel);
+                    }
+                }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Añade texturas a la lista para poder generar el atlas de referencia VAT.",
+                    MessageType.Info);
+                if (pImagesCount != null && pImagesCount.intValue != 0) pImagesCount.intValue = 0;
+                if (pColumns != null && pColumns.intValue < 1) pColumns.intValue = 1;
+            }
+        }
+
+        if (pAtlas != null)
+        {
+            EditorGUILayout.PropertyField(pAtlas, VatAtlasContent);
+        }
+
+        GUILayout.Space(2f);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.FlexibleSpace();
+            using (new EditorGUI.DisabledScope(validTextures == 0))
+            {
+                if (GUILayout.Button(VatGenerateButtonContent, GUILayout.Width(200f)))
+                {
+                    GenerateVatReferenceAtlas(pNote, pReferenceTextures, pAtlas, pImagesCount, pColumns);
+                }
+            }
+            GUILayout.FlexibleSpace();
+        }
+
+        DrawVatAtlasPreview(pAtlas, pImagesCount?.intValue ?? 0, pColumns?.intValue ?? 0);
+    }
+
+    int CountValidVatTextures(SerializedProperty texturesProperty)
+    {
+        if (texturesProperty == null || !texturesProperty.isArray) return 0;
+
+        int count = 0;
+        for (int i = 0; i < texturesProperty.arraySize; i++)
+        {
+            var element = texturesProperty.GetArrayElementAtIndex(i);
+            if (element != null && element.propertyType == SerializedPropertyType.ObjectReference
+                && element.objectReferenceValue is Texture2D)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    void DrawVatAtlasPreview(SerializedProperty atlasProperty, int imagesCount, int columns)
+    {
+        if (atlasProperty == null) return;
+        var atlasTex = atlasProperty.objectReferenceValue as Texture2D;
+        if (atlasTex == null) return;
+
+        GUILayout.Space(6f);
+        float aspect = atlasTex.height > 0 ? (float)atlasTex.width / atlasTex.height : 1f;
+        aspect = Mathf.Clamp(aspect, 0.1f, 10f);
+        Rect previewRect = GUILayoutUtility.GetAspectRect(aspect, GUILayout.Height(180f));
+        EditorGUI.DrawPreviewTexture(previewRect, atlasTex, null, ScaleMode.ScaleToFit);
+        if (Event.current.type == EventType.Repaint)
+        {
+            Handles.DrawSolidRectangleWithOutline(previewRect, Color.clear, new Color(1f, 1f, 1f, 0.2f));
+        }
+
+        GUILayout.Space(2f);
+        int shownImages = Mathf.Max(0, imagesCount);
+        int shownColumns = Mathf.Max(1, columns);
+        EditorGUILayout.LabelField(
+            $"{atlasTex.width} × {atlasTex.height}px • {shownImages} imágenes • {shownColumns} columnas",
+            EditorStyles.miniLabel);
+    }
+
+    void GenerateVatReferenceAtlas(SerializedProperty pNote,
+                                   SerializedProperty texturesProperty,
+                                   SerializedProperty atlasProperty,
+                                   SerializedProperty imagesCountProperty,
+                                   SerializedProperty columnsProperty)
+    {
+        if (texturesProperty == null || !texturesProperty.isArray)
+        {
+            EditorUtility.DisplayDialog("VAT UV Visual", "No se encontraron texturas de referencia.", "Aceptar");
+            return;
+        }
+
+        var textures = new List<Texture2D>();
+        for (int i = 0; i < texturesProperty.arraySize; i++)
+        {
+            var element = texturesProperty.GetArrayElementAtIndex(i);
+            if (element != null && element.propertyType == SerializedPropertyType.ObjectReference
+                && element.objectReferenceValue is Texture2D tex && tex != null)
+            {
+                textures.Add(tex);
+            }
+        }
+
+        if (textures.Count == 0)
+        {
+            EditorUtility.DisplayDialog("VAT UV Visual", "Añade texturas válidas antes de generar el atlas.", "Aceptar");
+            return;
+        }
+
+        int desiredImages = textures.Count;
+        if (imagesCountProperty != null && imagesCountProperty.intValue > 0)
+            desiredImages = Mathf.Clamp(imagesCountProperty.intValue, 1, textures.Count);
+
+        var texturesToUse = new List<Texture2D>();
+        for (int i = 0; i < Mathf.Min(desiredImages, textures.Count); i++)
+            texturesToUse.Add(textures[i]);
+
+        if (texturesToUse.Count == 0)
+        {
+            EditorUtility.DisplayDialog("VAT UV Visual", "No hay texturas válidas para generar el atlas.", "Aceptar");
+            return;
+        }
+
+        int columns = texturesToUse.Count;
+        if (columnsProperty != null && columnsProperty.intValue > 0)
+            columns = Mathf.Clamp(columnsProperty.intValue, 1, texturesToUse.Count);
+
+        if (!VatUvAtlasGenerator.TryBuildAtlas(texturesToUse, texturesToUse.Count, columns, out var result, out string error))
+        {
+            EditorUtility.DisplayDialog("VAT UV Visual", error ?? "No se pudo generar el atlas.", "Aceptar");
+            return;
+        }
+
+        string defaultName = BuildVatAtlasDefaultFileName(pNote);
+        string savePath = EditorUtility.SaveFilePanelInProject(
+            "Guardar atlas de referencia VAT UV",
+            defaultName,
+            "png",
+            "Selecciona la ubicación donde guardar el atlas generado.");
+
+        if (string.IsNullOrEmpty(savePath))
+        {
+            Object.DestroyImmediate(result.atlasTexture);
+            return;
+        }
+
+        try
+        {
+            SaveAtlasTextureAsPng(result.atlasTexture, savePath);
+        }
+        catch (System.Exception ex)
+        {
+            Object.DestroyImmediate(result.atlasTexture);
+            EditorUtility.DisplayDialog("VAT UV Visual", $"No se pudo guardar el atlas:\n{ex.Message}", "Aceptar");
+            return;
+        }
+
+        Object.DestroyImmediate(result.atlasTexture);
+
+        AssetDatabase.ImportAsset(savePath, ImportAssetOptions.ForceUpdate);
+        var atlasAsset = AssetDatabase.LoadAssetAtPath<Texture2D>(savePath);
+
+        Undo.RecordObject(tgt, "Generar atlas VAT UV");
+        if (atlasProperty != null)
+            atlasProperty.objectReferenceValue = atlasAsset;
+
+        if (imagesCountProperty != null)
+            imagesCountProperty.intValue = result.usedTextureCount;
+
+        if (columnsProperty != null)
+            columnsProperty.intValue = Mathf.Clamp(result.columns, 1, result.usedTextureCount);
+
+        serializedObject.ApplyModifiedProperties();
+        serializedObject.Update();
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        if (atlasAsset != null)
+            EditorGUIUtility.PingObject(atlasAsset);
+    }
+
+    string BuildVatAtlasDefaultFileName(SerializedProperty pNote)
+    {
+        string baseName = null;
+        if (pNote != null)
+        {
+            var pDiscoverName = pNote.FindPropertyRelative("discoverName");
+            if (pDiscoverName != null && !string.IsNullOrWhiteSpace(pDiscoverName.stringValue))
+                baseName = pDiscoverName.stringValue;
+        }
+
+        if (string.IsNullOrWhiteSpace(baseName))
+            baseName = tgt != null && tgt.gameObject != null ? tgt.gameObject.name : "VATAtlas";
+
+        baseName = SanitizeForFileName(baseName);
+        return string.IsNullOrEmpty(baseName) ? "VATAtlas" : $"{baseName}_VATAtlas";
+    }
+
+    string SanitizeForFileName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "VATAtlas";
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(name.Length);
+        for (int i = 0; i < name.Length; i++)
+        {
+            char c = name[i];
+            bool invalid = Array.IndexOf(invalidChars, c) >= 0 || c == '/';
+            sb.Append(invalid ? '_' : c);
+        }
+
+        string sanitized = sb.ToString().Trim();
+        return string.IsNullOrEmpty(sanitized) ? "VATAtlas" : sanitized;
+    }
+
+    void SaveAtlasTextureAsPng(Texture2D texture, string assetPath)
+    {
+        if (texture == null) throw new System.ArgumentNullException(nameof(texture));
+        if (string.IsNullOrEmpty(assetPath)) throw new System.ArgumentException("Ruta inválida", nameof(assetPath));
+
+        var pngData = texture.EncodeToPNG();
+        if (pngData == null || pngData.Length == 0)
+            throw new System.InvalidOperationException("No se pudo codificar el atlas en formato PNG.");
+
+        File.WriteAllBytes(assetPath, pngData);
+    }
 
     void DrawDiscoverContent_Fixed(SerializedProperty pNote)
     {

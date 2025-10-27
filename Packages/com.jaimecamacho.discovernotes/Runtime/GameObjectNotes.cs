@@ -51,6 +51,12 @@ public class GameObjectNotes : MonoBehaviour
         [Header("Contenido estructurado")]
         public List<DiscoverSection> discoverSections = new List<DiscoverSection>();
 
+        [Header("VAT UV Visual")]
+        public List<Texture2D> vatReferenceTextures = new List<Texture2D>();
+        [Min(0)] public int vatAtlasImageCount = 0;
+        [Min(1)] public int vatAtlasColumnCount = 1;
+        public Texture2D vatReferenceAtlas;
+
         [Header("Notas detalladas (texto plano)")]
         [TextArea(3, 15)]
         public string notes = "";
@@ -127,6 +133,28 @@ public class GameObjectNotes : MonoBehaviour
                 var section = n.discoverSections[s];
                 if (section == null) { n.discoverSections[s] = section = new DiscoverSection(); }
                 if (section.actions == null) section.actions = new List<DiscoverAction>();
+            }
+
+            if (n.vatReferenceTextures == null)
+                n.vatReferenceTextures = new List<Texture2D>();
+
+            int validVatTextures = 0;
+            for (int v = 0; v < n.vatReferenceTextures.Count; v++)
+            {
+                if (n.vatReferenceTextures[v] != null)
+                    validVatTextures++;
+            }
+
+            if (validVatTextures <= 0)
+            {
+                n.vatAtlasImageCount = 0;
+                if (n.vatAtlasColumnCount < 1) n.vatAtlasColumnCount = 1;
+            }
+            else
+            {
+                if (n.vatAtlasImageCount <= 0) n.vatAtlasImageCount = validVatTextures;
+                n.vatAtlasImageCount = Mathf.Clamp(n.vatAtlasImageCount, 1, validVatTextures);
+                n.vatAtlasColumnCount = Mathf.Clamp(n.vatAtlasColumnCount, 1, n.vatAtlasImageCount);
             }
 
 #if UNITY_EDITOR
