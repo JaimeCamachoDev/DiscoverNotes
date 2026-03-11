@@ -1,13 +1,27 @@
 {
-  "author": "Jaime Camacho",
-  "displayName": "DiscoverNotes",
-  "keywords": [
-    "unity"
-  ],
-  "license": "MIT",
   "name": "com.jaimecamacho.discovernotes",
+  "version": "1.0.0",
+  "displayName": "DiscoverNotes",
+  "description": "Visual documentation notes for Unity scenes, GameObjects, and production workflows.",
   "unity": "6000.0",
   "unityRelease": "0f1",
-  "version": "1.0.0",
-  "description": "Es un componente de documentación visual en Unity para notas."
+  "license": "MIT",
+  "author": {
+    "name": "Jaime Camacho",
+    "url": "https://github.com/JaimeCamachoDev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JaimeCamachoDev/DiscoverNotes.git"
+  },
+  "documentationUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes#readme",
+  "changelogUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/LICENSE",
+  "keywords": [
+    "unity",
+    "documentation",
+    "notes",
+    "editor",
+    "tooling"
+  ]
 }

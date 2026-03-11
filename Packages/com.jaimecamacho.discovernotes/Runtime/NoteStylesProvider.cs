@@ -25,7 +25,15 @@ public static class NoteStylesProvider
     {
         EditorApplication.projectChanged += ClearCaches;
         AssemblyReloadEvents.beforeAssemblyReload += ClearCaches;
-        GetOrCreateStyles();
+        EditorApplication.delayCall += WarmupStylesCache;
+    }
+
+    static void WarmupStylesCache()
+    {
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            return;
+
+        TryLoadStyles(out _);
     }
 
     static void ClearCaches()
@@ -57,55 +65,57 @@ public static class NoteStylesProvider
             return s_cachedStyles;
 
         var path = StylesAssetPath;
-        var styles = AssetDatabase.LoadAssetAtPath<NoteStyles>(path);
+        if (TryLoadStyles(out var styles))
+            return styles;
 
-        if (styles == null)
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            return null;
+
+        if (File.Exists(path))
         {
-            // ¿Existe en otro sitio? (auto-migración)
-            var anyGuid = AssetDatabase.FindAssets("t:NoteStyles").FirstOrDefault();
-            if (!string.IsNullOrEmpty(anyGuid))
-            {
-                var existingPath = AssetDatabase.GUIDToAssetPath(anyGuid);
-                var existing = AssetDatabase.LoadAssetAtPath<NoteStyles>(existingPath);
-                if (existing != null)
-                {
-                    var targetDir = Path.GetDirectoryName(path);
-                    if (!string.IsNullOrEmpty(targetDir))
-                    {
-                        EnsureFolderExists(targetDir.Replace("\\", "/"));
-                    }
-                    if (!string.Equals(existingPath, path, StringComparison.Ordinal))
-                    {
-                        var err = AssetDatabase.MoveAsset(existingPath, path);
-                        if (!string.IsNullOrEmpty(err))
-                        {
-                            Debug.LogWarning($"NoteStyles: no se pudo mover automáticamente: {err}. Usando el existente en {existingPath}");
-                            s_cachedStyles = existing;
-                            BuildSimpleCaches();
-                            return s_cachedStyles;
-                        }
-                    }
-
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
-                    s_cachedStyles = existing;
-                    BuildSimpleCaches();
-                    return s_cachedStyles;
-                }
-            }
-
-            // Crear nuevo
-            var directory = Path.GetDirectoryName(path)?.Replace("\\", "/");
-            if (!string.IsNullOrEmpty(directory))
-            {
-                EnsureFolderExists(directory);
-            }
-
-            styles = ScriptableObject.CreateInstance<NoteStyles>();
-            AssetDatabase.CreateAsset(styles, path);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            Debug.LogWarning($"NoteStyles: the asset already exists at {path}, but it is not available yet. Automatic recreation is skipped for this import cycle.");
+            return null;
         }
+
+        var anyGuid = AssetDatabase.FindAssets("t:NoteStyles").FirstOrDefault();
+        if (!string.IsNullOrEmpty(anyGuid))
+        {
+            var existingPath = AssetDatabase.GUIDToAssetPath(anyGuid);
+            var existing = AssetDatabase.LoadAssetAtPath<NoteStyles>(existingPath);
+            if (existing != null)
+            {
+                var targetDir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(targetDir))
+                    EnsureFolderExists(targetDir.Replace("\\", "/"));
+
+                if (!string.Equals(existingPath, path, StringComparison.Ordinal))
+                {
+                    var err = AssetDatabase.MoveAsset(existingPath, path);
+                    if (!string.IsNullOrEmpty(err))
+                    {
+                        Debug.LogWarning($"NoteStyles: automatic move failed: {err}. Using existing asset at {existingPath}");
+                        s_cachedStyles = existing;
+                        BuildSimpleCaches();
+                        return s_cachedStyles;
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                s_cachedStyles = existing;
+                BuildSimpleCaches();
+                return s_cachedStyles;
+            }
+        }
+
+        var directory = Path.GetDirectoryName(path)?.Replace("\\", "/");
+        if (!string.IsNullOrEmpty(directory))
+            EnsureFolderExists(directory);
+
+        styles = ScriptableObject.CreateInstance<NoteStyles>();
+        AssetDatabase.CreateAsset(styles, path);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
 
         s_cachedStyles = styles;
         BuildSimpleCaches();
@@ -130,9 +140,7 @@ public static class NoteStylesProvider
             : Array.Empty<string>();
 
         if (s_cachedAuthors.Length == 0)
-        {
-            s_cachedAuthors = new[] { "Anónimo" };
-        }
+            s_cachedAuthors = new[] { "Anonimo" };
 
         if (s_cachedStyles.categories != null && s_cachedStyles.categories.Count > 0)
         {
@@ -202,29 +210,41 @@ public static class NoteStylesProvider
     {
         if (string.IsNullOrEmpty(name))
         {
-            var s = GetOrCreateStyles();
-            if (s == null || s.categories == null || s.categories.Count == 0)
+            var styles = GetOrCreateStyles();
+            if (styles == null || styles.categories == null || styles.categories.Count == 0)
                 return null;
 
-            return s.categories[0];
+            return styles.categories[0];
         }
 
         if (s_lastCategory != null && s_lastCategoryForFind == name)
             return s_lastCategory;
 
-        var styles = GetOrCreateStyles();
-        if (styles == null || styles.categories == null || styles.categories.Count == 0)
+        var loadedStyles = GetOrCreateStyles();
+        if (loadedStyles == null || loadedStyles.categories == null || loadedStyles.categories.Count == 0)
             return null;
 
-        var category = styles.categories.FirstOrDefault(x => x != null && x.name == name) ?? styles.categories[0];
+        var category = loadedStyles.categories.FirstOrDefault(x => x != null && x.name == name) ?? loadedStyles.categories[0];
         s_lastCategory = category;
         s_lastCategoryForFind = name;
         return category;
     }
 
-    public static string[] GetCategoryNames() => s_cachedCategoryNames ?? Array.Empty<string>();
+    public static string[] GetCategoryNames()
+    {
+        if (s_cachedStyles == null)
+            GetOrCreateStyles();
 
-    public static string[] GetAuthors() => s_cachedAuthors ?? new[] { "Anónimo" };
+        return s_cachedCategoryNames ?? Array.Empty<string>();
+    }
+
+    public static string[] GetAuthors()
+    {
+        if (s_cachedStyles == null)
+            GetOrCreateStyles();
+
+        return s_cachedAuthors ?? new[] { "Anonimo" };
+    }
 
     [MenuItem("Tools/Notes/Open NoteStyles")]
     public static void SelectStylesAsset()
@@ -234,7 +254,6 @@ public static class NoteStylesProvider
         EditorGUIUtility.PingObject(styles);
     }
 
-    // ---------- Helpers ----------
     static string ComputeAssetPath()
     {
         if (string.IsNullOrEmpty(s_cachedScriptPath))
@@ -252,11 +271,11 @@ public static class NoteStylesProvider
             }
 
             if (string.IsNullOrEmpty(s_cachedScriptPath))
-                return "Assets/5-Settings/NoteStyles.asset"; // fallback en Settings
+                return "Assets/5-Settings/NoteStyles.asset";
         }
 
-        var dir = Path.GetDirectoryName(s_cachedScriptPath)?.Replace("\\", "/");   // .../Core
-        var parent = Path.GetDirectoryName(dir ?? string.Empty)?.Replace("\\", "/"); // .../Notes (carpeta de encima)
+        var dir = Path.GetDirectoryName(s_cachedScriptPath)?.Replace("\\", "/");
+        var parent = Path.GetDirectoryName(dir ?? string.Empty)?.Replace("\\", "/");
         if (!string.IsNullOrEmpty(parent))
             return $"{parent}/NoteStyles.asset";
 
@@ -275,12 +294,21 @@ public static class NoteStylesProvider
             var next = parts[i];
             var combined = $"{current}/{next}";
             if (!AssetDatabase.IsValidFolder(combined))
-            {
                 AssetDatabase.CreateFolder(current, next);
-            }
 
             current = combined;
         }
+    }
+
+    static bool TryLoadStyles(out NoteStyles styles)
+    {
+        styles = AssetDatabase.LoadAssetAtPath<NoteStyles>(StylesAssetPath);
+        if (styles == null)
+            return false;
+
+        s_cachedStyles = styles;
+        BuildSimpleCaches();
+        return true;
     }
 }
 #endif

@@ -887,7 +887,7 @@ public class GameObjectNotesEditor : Editor
 
         if (string.IsNullOrEmpty(savePath))
         {
-            Object.DestroyImmediate(result.atlasTexture);
+            UnityEngine.Object.DestroyImmediate(result.atlasTexture);
             return;
         }
 
@@ -897,12 +897,12 @@ public class GameObjectNotesEditor : Editor
         }
         catch (System.Exception ex)
         {
-            Object.DestroyImmediate(result.atlasTexture);
+            UnityEngine.Object.DestroyImmediate(result.atlasTexture);
             EditorUtility.DisplayDialog("VAT UV Visual", $"No se pudo guardar el atlas:\n{ex.Message}", "Aceptar");
             return;
         }
 
-        Object.DestroyImmediate(result.atlasTexture);
+        UnityEngine.Object.DestroyImmediate(result.atlasTexture);
 
         AssetDatabase.ImportAsset(savePath, ImportAssetOptions.ForceUpdate);
         var atlasAsset = AssetDatabase.LoadAssetAtPath<Texture2D>(savePath);
