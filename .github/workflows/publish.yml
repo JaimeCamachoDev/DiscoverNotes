@@ -5,8 +5,7 @@ on:
     types: [created]
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write  # Requerido para poder hacer commit
 
 jobs:
   publish:
@@ -14,13 +13,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v3
 
       - name: Setup Node
-        uses: actions/setup-node@v4
-
+        uses: actions/setup-node@v3
         with:
-          node-version: 24
+          node-version: 18
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Set package path
@@ -37,6 +35,8 @@ jobs:
         run: |
           jq --arg v "$VERSION" '.version = $v' "$PACKAGE_DIR/package.json" > tmp.json && mv tmp.json "$PACKAGE_DIR/package.json"
 
+      # Paso de commit y push eliminado
+
       - name: Sync README into package
         run: |
           mkdir -p "$PACKAGE_DIR"
@@ -45,3 +45,5 @@ jobs:
       - name: Publish package to npm
         run: npm publish
         working-directory: ${{ env.PACKAGE_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_PACKAGE }}
