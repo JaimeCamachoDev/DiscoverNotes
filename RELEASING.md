@@ -4,30 +4,17 @@ This repository uses a Unity 6.3 signing-first workflow for npm releases.
 
 ## Fast path
 
-For the normal release path from a maintainer machine:
-
-```powershell
-.\Release-DiscoverNotes.bat -Version 1.2.5
-```
-
-If Unity CLI signing fails on your machine, use the manual-sign wrapper instead:
+Use the manual-sign wrapper:
 
 ```powershell
 .\Release-DiscoverNotes-ManualSign.bat -Version 1.2.5
 ```
 
-Generic launcher from this repo:
+Use the publish-only wrapper when the signed `.tgz` already exists:
 
 ```powershell
-.\Start-UpmRelease.bat
+.\Publish-SignedTarball.bat -Version 1.2.5
 ```
-
-It prompts for:
-
-- project root path
-- target version
-
-If the target project already contains `Release-DiscoverNotes-ManualSign.bat`, it uses it. Otherwise it falls back to `scripts\Release-DiscoverNotes.ps1`.
 
 Default assumptions in the wrapper:
 
@@ -133,19 +120,13 @@ The publish script validates that:
 ### 5. All-in-one command
 
 ```powershell
-.\scripts\Release-DiscoverNotes.ps1 -Version 1.2.5
-```
-
-Manual sign all-in-one:
-
-```powershell
-.\Release-DiscoverNotes.bat -Version 1.2.5 -ManualSign
-```
-
-or:
-
-```powershell
 .\Release-DiscoverNotes-ManualSign.bat -Version 1.2.5
+```
+
+Publish only:
+
+```powershell
+.\Publish-SignedTarball.bat -Version 1.2.5
 ```
 
 Optional commit and tag creation:

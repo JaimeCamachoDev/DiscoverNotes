@@ -4,25 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning.
 
-## [1.2.8] - 2026-03-16
+## [1.3.2] - 2026-03-20
 
-- Describe the main change in this release.
-- Describe any packaging or workflow change.
-- Describe any Unity-facing impact for users.
+- na
+- na
+- na
 
+## [1.3.1] - 2026-03-20
 
+- fixes
+- updates
+- features
+
+## [1.3.0] - 2026-03-20
+
+- some updates
+- some fixes
+- more fixes
 
 ## [1.2.7] - 2026-03-16
 
 - Publish Auto
 - connect to npm
-- Sign and Update## [1.2.6] - 2026-03-16
+- Sign and Update
+
+## [1.2.6] - 2026-03-16
 
 - Published the first verified Unity-signed scoped-registry release workflow for DiscoverNotes.
 - Added a manual-sign release path that prepares metadata, waits for signed `.tgz` export, and publishes to npm.
 - Confirmed Unity Package Manager updates now preserve the package signature in consumer projects.
-
-
 
 ## [1.2.5] - 2026-03-16
 
@@ -42,6 +52,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Added the `GameObjectNotes` component for visual in-editor documentation.
 - Added note categories, authors, hierarchy tooltip support, and rich text rendering.
 - Added structured Discover sections and VAT UV atlas support.
+
+
+
+
+
+
 
 
 

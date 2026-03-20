@@ -29,6 +29,18 @@ function Get-PackageVersion([string]$PackageJsonPath)
     return $package.version
 }
 
+function Normalize-VersionInput([string]$InputVersion)
+{
+    if ([string]::IsNullOrWhiteSpace($InputVersion))
+    {
+        return $InputVersion
+    }
+
+    $normalized = $InputVersion.Trim()
+    $normalized = $normalized -replace '^(?i)version\s+', ''
+    return $normalized.Trim()
+}
+
 function Get-ChangelogSection([string]$Path, [string]$TargetVersion)
 {
     $content = Get-Content -Raw -Path $Path
@@ -54,7 +66,7 @@ function Set-ChangelogSection([string]$Path, [string]$TargetVersion, [string[]]$
 
     $date = Get-Date -Format "yyyy-MM-dd"
     $bulletBlock = ($Notes | ForEach-Object { "- $_" }) -join "`r`n"
-    $replacement = "## [$TargetVersion] - $date`r`n`r`n$bulletBlock"
+    $replacement = "## [$TargetVersion] - $date`r`n`r`n$bulletBlock`r`n`r`n"
     $updatedContent = $content.Substring(0, $match.Index) + $replacement + $content.Substring($match.Index + $match.Length)
     Set-Content -Path $Path -Value $updatedContent -Encoding UTF8
 }
@@ -144,6 +156,8 @@ if ([string]::IsNullOrWhiteSpace($Version))
 {
     $Version = Read-Host "Version to release"
 }
+
+$Version = Normalize-VersionInput -InputVersion $Version
 
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$')
 {

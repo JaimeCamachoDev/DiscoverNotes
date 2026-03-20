@@ -139,6 +139,70 @@ Suggested gallery block:
 - License: [MIT](LICENSE)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
+## Release Workflow
+
+This package now uses a Unity 6.3 signed tarball workflow for npm releases.
+
+### Normal release
+
+From PowerShell in the repository root:
+
+```powershell
+cd E:\DiscoverNotes
+.\Release-DiscoverNotes-ManualSign.bat -Version X.Y.Z
+```
+
+Example:
+
+```powershell
+cd E:\DiscoverNotes
+.\Release-DiscoverNotes-ManualSign.bat -Version 1.3.0
+```
+
+What it does:
+
+1. Updates `package.json` to the requested version.
+2. Syncs `README.md`, `CHANGELOG.md`, and `LICENSE` into the package.
+3. Creates the changelog section if it does not exist yet.
+4. Prompts for changelog notes if the new section still contains placeholder text.
+5. Waits for a signed Unity export.
+6. Publishes the signed `.tgz` to npm.
+
+### Manual Unity export step
+
+When the script pauses, export the signed tarball from Unity Package Manager and save it here:
+
+```text
+E:\DiscoverNotes\ReleaseArtifacts\com.jaimecamacho.discovernotes-X.Y.Z.tgz
+```
+
+Then return to the console and press `Enter`.
+
+### Publish an already exported tarball
+
+If the signed `.tgz` already exists, you can publish it directly:
+
+```powershell
+cd E:\DiscoverNotes
+.\Publish-SignedTarball.bat -Version X.Y.Z
+```
+
+### Optional Git automation
+
+You can ask the release script to create the release commit and tag too:
+
+```powershell
+cd E:\DiscoverNotes
+.\Release-DiscoverNotes-ManualSign.bat -Version X.Y.Z -CreateGitCommit -CreateGitTag -PushGitTag
+```
+
+### Notes
+
+- Run the commands from `E:\DiscoverNotes`.
+- In PowerShell, use `cd E:\DiscoverNotes`, not `cd /d E:\DiscoverNotes`.
+- The tarball must be Unity-signed. The publish script validates that before uploading.
+- Full release notes are documented in [RELEASING.md](RELEASING.md).
+
 ## Unity Version
 
 Current package metadata targets Unity `6000.0.0f1`.
