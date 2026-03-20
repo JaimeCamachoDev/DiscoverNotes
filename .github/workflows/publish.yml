@@ -1,49 +1,43 @@
-name: Publish to npmjs
+name: Validate UPM Release
 
 on:
-  release:
-    types: [created]
+  pull_request:
+    paths:
+      - "Packages/com.jaimecamacho.discovernotes/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/publish.yml"
+      - "scripts/**"
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths:
+      - "Packages/com.jaimecamacho.discovernotes/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/publish.yml"
+      - "scripts/**"
+  workflow_dispatch:
 
 permissions:
-  contents: write  # Requerido para poder hacer commit
+  contents: read
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
-          registry-url: 'https://registry.npmjs.org/'
+          node-version: 24
 
-      - name: Set package path
+      - name: Validate package metadata
+        shell: pwsh
         run: |
-          repo_name=${GITHUB_REPOSITORY##*/}
-          repo_lower=$(echo "$repo_name" | tr '[:upper:]' '[:lower:]')
-          echo "PACKAGE_DIR=Packages/com.jaimecamacho.$repo_lower" >> $GITHUB_ENV
-
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-
-      - name: Update version in package.json
-        run: |
-          jq --arg v "$VERSION" '.version = $v' "$PACKAGE_DIR/package.json" > tmp.json && mv tmp.json "$PACKAGE_DIR/package.json"
-
-      # Paso de commit y push eliminado
-
-      - name: Sync README into package
-        run: |
-          mkdir -p "$PACKAGE_DIR"
-          cp README.md "$PACKAGE_DIR/README.md"
-
-      - name: Publish package to npm
-        run: npm publish
-        working-directory: ${{ env.PACKAGE_DIR }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_PACKAGE }}
+          ./scripts/Test-UpmPackage.ps1

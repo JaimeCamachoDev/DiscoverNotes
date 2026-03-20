@@ -63,3 +63,6 @@ crashlytics-build.properties
 *.app
 *.exe
 *_DoNotShip*
+
+# Artefactos de publicacion UPM firmados
+ReleaseArtifacts/

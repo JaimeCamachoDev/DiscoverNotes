@@ -13,6 +13,13 @@
       "dependencies": {},
       "url": "https://registry.npmjs.org"
     },
+    "com.jaimecamacho.unityfolders": {
+      "version": "1.2.4",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://registry.npmjs.org"
+    },
     "com.unity.burst": {
       "version": "1.8.28",
       "depth": 2,
@@ -141,6 +148,15 @@
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
       }
+    },
+    "jp.keijiro.duotone": {
+      "version": "2.3.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0"
+      },
+      "url": "https://registry.npmjs.com"
     },
     "com.unity.modules.adaptiveperformance": {
       "version": "1.0.0",

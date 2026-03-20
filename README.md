@@ -15,7 +15,30 @@ DiscoverNotes is a Unity package for adding visual, structured documentation dir
 
 ## Installation
 
-Install through Unity Package Manager with a Git URL:
+### Scoped Registry
+
+For team distribution through Unity Package Manager, add this scoped registry to `Packages/manifest.json`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "JaimeCamachoDev",
+      "url": "https://registry.npmjs.org",
+      "scopes": [
+        "com.jaimecamacho"
+      ]
+    }
+  ],
+  "dependencies": {
+    "com.jaimecamacho.discovernotes": "1.2.4"
+  }
+}
+```
+
+### Git URL
+
+You can also install directly from GitHub:
 
 ```json
 {

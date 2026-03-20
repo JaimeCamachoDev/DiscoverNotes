@@ -1,27 +1,30 @@
-{
-  "name": "com.jaimecamacho.discovernotes",
-  "version": "1.0.0",
-  "displayName": "DiscoverNotes",
-  "description": "Visual documentation notes for Unity scenes, GameObjects, and production workflows.",
-  "unity": "6000.0",
-  "unityRelease": "0f1",
-  "license": "MIT",
-  "author": {
-    "name": "Jaime Camacho",
-    "url": "https://github.com/JaimeCamachoDev"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/JaimeCamachoDev/DiscoverNotes.git"
-  },
-  "documentationUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes#readme",
-  "changelogUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/LICENSE",
-  "keywords": [
-    "unity",
-    "documentation",
-    "notes",
-    "editor",
-    "tooling"
-  ]
+﻿{
+    "name":  "com.jaimecamacho.discovernotes",
+    "version":  "1.2.7",
+    "displayName":  "DiscoverNotes",
+    "description":  "Visual documentation notes for Unity scenes, GameObjects, and production workflows.",
+    "unity":  "6000.0",
+    "unityRelease":  "0f1",
+    "license":  "MIT",
+    "author":  {
+                   "name":  "Jaime Camacho",
+                   "url":  "https://github.com/JaimeCamachoDev"
+               },
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/JaimeCamachoDev/DiscoverNotes.git"
+                   },
+    "documentationUrl":  "https://github.com/JaimeCamachoDev/DiscoverNotes#readme",
+    "changelogUrl":  "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/CHANGELOG.md",
+    "licensesUrl":  "https://github.com/JaimeCamachoDev/DiscoverNotes/blob/main/LICENSE",
+    "keywords":  [
+                     "unity",
+                     "documentation",
+                     "notes",
+                     "editor",
+                     "tooling"
+                 ],
+    "_upm":  {
+                 "changelog":  "- Publish Auto\n- connect to npm\n- Sign and Update## [1.2.6] - 2026-03-16\n\n- Published the first verified Unity-signed scoped-registry release workflow for DiscoverNotes.\n- Added a manual-sign release path that prepares metadata, waits for signed `.tgz` export, and publishes to npm.\n- Confirmed Unity Package Manager updates now preserve the package signature in consumer projects."
+             }
 }
