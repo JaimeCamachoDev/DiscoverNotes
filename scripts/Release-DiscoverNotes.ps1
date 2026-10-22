@@ -2,7 +2,7 @@ param(
     [string]$Version,
     [string]$UnityPath = "E:\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe",
     [string]$CloudOrganization = "7972342390247",
-    [string]$PackagePath = "Packages/com.jaimecamacho.discovernotes",
+    [string]$PackagePath = "Packages/com.jaimecamachodev.discovernotes",
     [string]$OutputDirectory = "ReleaseArtifacts",
     [string[]]$ChangelogNotes,
     [switch]$SkipPrepare,

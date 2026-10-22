@@ -11,7 +11,7 @@ DiscoverNotes is a Unity package for adding visual, structured documentation dir
 - Hierarchy tooltip support for quick review.
 - Structured Discover sections for production notes.
 - VAT UV atlas tooling for visual reference workflows.
-- Distributed as `com.jaimecamacho.discovernotes`.
+- Distributed as `com.jaimecamachodev.discovernotes`.
 
 ## Installation
 
@@ -31,7 +31,7 @@ For team distribution through Unity Package Manager, add this scoped registry to
     }
   ],
   "dependencies": {
-    "com.jaimecamacho.discovernotes": "1.2.4"
+    "com.jaimecamachodev.discovernotes": "1.2.4"
   }
 }
 ```
@@ -43,7 +43,7 @@ You can also install directly from GitHub:
 ```json
 {
   "dependencies": {
-    "com.jaimecamacho.discovernotes": "https://github.com/JaimeCamachoDev/DiscoverNotes.git?path=/Packages/com.jaimecamacho.discovernotes"
+    "com.jaimecamachodev.discovernotes": "https://github.com/JaimeCamachoDev/DiscoverNotes.git?path=/Packages/com.jaimecamachodev.discovernotes"
   }
 }
 ```
@@ -51,7 +51,7 @@ You can also install directly from GitHub:
 You can also use `Window > Package Manager > Add package from git URL...` and paste:
 
 ```text
-https://github.com/JaimeCamachoDev/DiscoverNotes.git?path=/Packages/com.jaimecamacho.discovernotes
+https://github.com/JaimeCamachoDev/DiscoverNotes.git?path=/Packages/com.jaimecamachodev.discovernotes
 ```
 
 ## What It Solves
@@ -115,7 +115,7 @@ DiscoverNotes supports lightweight authoring patterns inside notes:
 
 ## Screenshots
 
-The README is prepared to host component screenshots under `Packages/com.jaimecamacho.discovernotes/Documentation~/images/`.
+The README is prepared to host component screenshots under `Packages/com.jaimecamachodev.discovernotes/Documentation~/images/`.
 
 Suggested screenshot filenames:
 
@@ -126,9 +126,9 @@ Suggested screenshot filenames:
 Suggested gallery block:
 
 ```md
-![Package manifest](Packages/com.jaimecamacho.discovernotes/Documentation~/images/discovernotes-manifest.png)
-![Component editor](Packages/com.jaimecamacho.discovernotes/Documentation~/images/discovernotes-editor.png)
-![Rendered note preview](Packages/com.jaimecamacho.discovernotes/Documentation~/images/discovernotes-preview.png)
+![Package manifest](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-manifest.png)
+![Component editor](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-editor.png)
+![Rendered note preview](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-preview.png)
 ```
 
 ## Repository
@@ -173,7 +173,7 @@ What it does:
 When the script pauses, export the signed tarball from Unity Package Manager and save it here:
 
 ```text
-E:\DiscoverNotes\ReleaseArtifacts\com.jaimecamacho.discovernotes-X.Y.Z.tgz
+E:\DiscoverNotes\ReleaseArtifacts\com.jaimecamachodev.discovernotes-X.Y.Z.tgz
 ```
 
 Then return to the console and press `Enter`.

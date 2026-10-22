@@ -1,5 +1,5 @@
 param(
-    [string]$PackagePath = "Packages/com.jaimecamacho.discovernotes"
+    [string]$PackagePath = "Packages/com.jaimecamachodev.discovernotes"
 )
 
 $ErrorActionPreference = "Stop"

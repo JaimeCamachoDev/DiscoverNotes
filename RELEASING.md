@@ -20,7 +20,7 @@ Default assumptions in the wrapper:
 
 - Unity path: `E:\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe`
 - Cloud organization id: `7972342390247`
-- Package path: `Packages/com.jaimecamacho.discovernotes`
+- Package path: `Packages/com.jaimecamachodev.discovernotes`
 - Output folder: `ReleaseArtifacts`
 
 Optional switches:
@@ -51,7 +51,7 @@ The workflow below keeps the scoped registry catalog in Unity Package Manager an
 ## Prerequisites
 
 - Unity 6.3 installed locally.
-- npm account with publish access to `com.jaimecamacho.discovernotes`.
+- npm account with publish access to `com.jaimecamachodev.discovernotes`.
 - `npm.cmd whoami` must work on the machine that publishes.
 - Unity credentials with permission to sign for organization `7972342390247` if using CLI signing.
 
@@ -65,7 +65,7 @@ The workflow below keeps the scoped registry catalog in Unity Package Manager an
 
 This does four things:
 
-- updates `Packages/com.jaimecamacho.discovernotes/package.json`
+- updates `Packages/com.jaimecamachodev.discovernotes/package.json`
 - copies `README.md` into the package
 - copies `CHANGELOG.md` into the package
 - copies `LICENSE` into the package
@@ -77,7 +77,7 @@ This does four things:
 Commit the release changes and create the Git tag:
 
 ```powershell
-git add README.md CHANGELOG.md LICENSE Packages/com.jaimecamacho.discovernotes scripts RELEASING.md .github/workflows/publish.yml
+git add README.md CHANGELOG.md LICENSE Packages/com.jaimecamachodev.discovernotes scripts RELEASING.md .github/workflows/publish.yml
 git commit -m "Release 1.2.5"
 git tag v1.2.5
 git push origin main --tags
@@ -102,13 +102,13 @@ The signed tarball is written to `ReleaseArtifacts/`.
 If CLI signing does not work for your account or org, export the signed tarball from the Unity Editor UI and save it into `ReleaseArtifacts/` with the expected name:
 
 ```text
-ReleaseArtifacts/com.jaimecamacho.discovernotes-1.2.5.tgz
+ReleaseArtifacts/com.jaimecamachodev.discovernotes-1.2.5.tgz
 ```
 
 ### 4. Publish the signed tarball to npm
 
 ```powershell
-./scripts/Publish-UpmPackage.ps1 -TarballPath "ReleaseArtifacts/com.jaimecamacho.discovernotes-1.2.5.tgz"
+./scripts/Publish-UpmPackage.ps1 -TarballPath "ReleaseArtifacts/com.jaimecamachodev.discovernotes-1.2.5.tgz"
 ```
 
 The publish script validates that:

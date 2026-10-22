@@ -1,14 +1,17 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning.
 
+## [1.4.0] - 2026-10-22
+
+- El paquete pasa a llamarse com.jaimecamachodev.discovernotes (antes com.jaimecamacho.discovernotes). Los GUID no cambian: las notas existentes siguen funcionando.
+- Se saca del paquete el asset de iluminación de la escena de demo (New Lighting Settings.lighting).
+
 ## [1.3.2] - 2026-03-20
 
-- na
-- na
-- na
+- Correcciones menores.
 
 ## [1.3.1] - 2026-03-20
 

@@ -1,0 +1,43 @@
+name: Validate UPM Release
+
+on:
+  pull_request:
+    paths:
+      - "Packages/com.jaimecamachodev.discovernotes/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/publish.yml"
+      - "scripts/**"
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths:
+      - "Packages/com.jaimecamachodev.discovernotes/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/publish.yml"
+      - "scripts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Validate package metadata
+        shell: pwsh
+        run: |
+          ./scripts/Test-UpmPackage.ps1

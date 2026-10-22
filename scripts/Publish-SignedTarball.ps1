@@ -1,7 +1,7 @@
 param(
     [string]$Version,
     [string]$OutputDirectory = "ReleaseArtifacts",
-    [string]$PackagePath = "Packages/com.jaimecamacho.discovernotes",
+    [string]$PackagePath = "Packages/com.jaimecamachodev.discovernotes",
     [switch]$LoginIfNeeded
 )
 

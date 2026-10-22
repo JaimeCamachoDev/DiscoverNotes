@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "com.jaimecamacho.discovernotes": {
-      "version": "file:com.jaimecamacho.discovernotes",
+    "com.jaimecamachodev.discovernotes": {
+      "version": "file:com.jaimecamachodev.discovernotes",
       "depth": 0,
       "source": "embedded",
       "dependencies": {}
