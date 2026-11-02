@@ -205,4 +205,4 @@ cd E:\DiscoverNotes
 
 ## Unity Version
 
-Current package metadata targets Unity `6000.3.27f1`.
+Current package metadata targets Unity `6000.0.0f1` (minimum supported version).
