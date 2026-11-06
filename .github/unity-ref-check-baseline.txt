@@ -1,0 +1,3 @@
+# Línea base de unity-ref-check: problemas conocidos que no hacen fallar la revisión.
+# Formato: tipo<TAB>guid o ruta<TAB>fichero. Se regenera con --write-baseline.
+otros	922df76fdd5a8334b92519c5321c1acb	Assets/6-Prefabs/GameObject (1).prefab
