@@ -115,21 +115,7 @@ DiscoverNotes supports lightweight authoring patterns inside notes:
 
 ## Screenshots
 
-The README is prepared to host component screenshots under `Packages/com.jaimecamachodev.discovernotes/Documentation~/images/`.
-
-Suggested screenshot filenames:
-
-- `discovernotes-manifest.png`
-- `discovernotes-editor.png`
-- `discovernotes-preview.png`
-
-Suggested gallery block:
-
-```md
-![Package manifest](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-manifest.png)
-![Component editor](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-editor.png)
-![Rendered note preview](Packages/com.jaimecamachodev.discovernotes/Documentation~/images/discovernotes-preview.png)
-```
+![Game Object Notes component in the Inspector: header, tags, links, mentions, checkboxes, colors, sizes and emojis](https://raw.githubusercontent.com/JaimeCamachoDev/DiscoverNotes/main/.github/preview.png)
 
 ## Repository
 
